@@ -84,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <body>
                         <div class='container'>
                             <div class='header'>
-                                <h1>AC-TECHNOLOGY</h1>
+                                <h1>Sims-Tech Zambia</h1>
                                 <p>Customer Account Created</p>
                             </div>
                             <div class='content'>
@@ -102,7 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <p>If you have any questions, please contact us.</p>
                             </div>
                             <div class='footer'>
-                                <p>&copy; " . date('Y') . " AC-TECHNOLOGY. All rights reserved.</p>
+                                <p>&copy; " . date('Y') . " Sims-Tech Zambia. All rights reserved.</p>
                             </div>
                         </div>
                     </body>
@@ -122,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Customer Signup - AC-TECHNOLOGY</title>
+    <title>Customer Signup - Sims-Tech Zambia</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -167,7 +167,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="auth-container">
         <div class="auth-card">
             <div class="auth-header">
-                <img src="assets/images/logo.png" alt="AC-TECHNOLOGY Logo" onerror="this.style.display='none'">
+                <img src="assets/images/sims-tech-logo.jpg" alt="Sims-Tech Zambia Logo" onerror="this.style.display='none'">
                 <h1>Create Customer Account</h1>
                 <p>Sign up to book repairs and track your devices</p>
             </div>

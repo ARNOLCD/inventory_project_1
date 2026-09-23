@@ -3,8 +3,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
 ?>
 <aside class="sidebar">
     <div class="sidebar-header">
-        <img src="assets/images/logo.png" alt="AC-TECHNOLOGY Logo" onerror="this.style.display='none'">
-        <h2>AC-TECHNOLOGY</h2>
+        <img src="assets/images/sims-tech-logo.jpg" alt="Sims-Tech Zambia Logo" onerror="this.style.display='none'">
+        <h2>Sims-Tech Zambia</h2>
     </div>
     <nav class="sidebar-menu">
         <?php if (isCustomer()): ?>

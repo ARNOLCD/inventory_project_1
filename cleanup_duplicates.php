@@ -1,5 +1,7 @@
 <?php
 require_once 'config/database.php';
+require_once 'config/session.php';
+requireAdmin();
 $conn = getDBConnection();
 
 echo "<h1>Database Cleanup - Removing Duplicates</h1>";

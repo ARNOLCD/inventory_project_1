@@ -40,7 +40,7 @@ $categories_result = $conn->query("
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo htmlspecialchars($company['name'] ?? 'AC-TECHNOLOGY'); ?> - Your Trusted Technology Partner</title>
+    <title><?php echo htmlspecialchars($company['name'] ?? 'Sims-Tech Zambia'); ?> - Your Trusted Technology Partner</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -483,8 +483,8 @@ $categories_result = $conn->query("
     <nav class="navbar">
         <div class="container">
             <a href="index.php" class="navbar-brand">
-                <img src="assets/images/logo.png" alt="AC-TECHNOLOGY Logo" onerror="this.style.display='none'">
-                <span>AC-TECHNOLOGY</span>
+                <img src="assets/images/sims-tech-logo.jpg" alt="Sims-Tech Zambia Logo" onerror="this.style.display='none'">
+                <span>Sims-Tech Zambia</span>
             </a>
             <ul class="nav-links">
                 <li><a href="#home" class="nav-red">Home</a></li>
@@ -518,11 +518,11 @@ $categories_result = $conn->query("
         
         <!-- Floating Logos and Images -->
         <div class="floating-logos">
-            <img src="assets/images/logo.png" alt="" class="floating-logo floating-logo-1" onerror="this.style.display='none'">
-            <img src="assets/images/logo.png" alt="" class="floating-logo floating-logo-2" onerror="this.style.display='none'">
-            <img src="assets/images/logo.png" alt="" class="floating-logo floating-logo-3" onerror="this.style.display='none'">
-            <img src="assets/images/logo.png" alt="" class="floating-logo floating-logo-4" onerror="this.style.display='none'">
-            <img src="assets/images/logo.png" alt="" class="floating-logo floating-logo-5" onerror="this.style.display='none'">
+            <img src="assets/images/sims-tech-logo.jpg" alt="" class="floating-logo floating-logo-1" onerror="this.style.display='none'">
+            <img src="assets/images/sims-tech-logo.jpg" alt="" class="floating-logo floating-logo-2" onerror="this.style.display='none'">
+            <img src="assets/images/sims-tech-logo.jpg" alt="" class="floating-logo floating-logo-3" onerror="this.style.display='none'">
+            <img src="assets/images/sims-tech-logo.jpg" alt="" class="floating-logo floating-logo-4" onerror="this.style.display='none'">
+            <img src="assets/images/sims-tech-logo.jpg" alt="" class="floating-logo floating-logo-5" onerror="this.style.display='none'">
             
             <!-- Additional Tech Images -->
             <div class="floating-icon floating-icon-1">
@@ -552,9 +552,9 @@ $categories_result = $conn->query("
         </div>
         
         <div class="hero-content">
-            <img src="assets/images/logo.png" alt="AC-TECHNOLOGY Logo" class="hero-logo" onerror="this.src='https://via.placeholder.com/200x200?text=AC-TECH'">
-            <h1><?php echo htmlspecialchars($company['name'] ?? 'AC-TECHNOLOGY'); ?></h1>
-            <p><?php echo htmlspecialchars($company['tagline'] ?? 'Your Trusted Technology Partner - Quality Electronics, Expert Repairs, Professional Services'); ?></p>
+            <img src="assets/images/sims-tech-logo.jpg" alt="Sims-Tech Zambia Logo" class="hero-logo" onerror="this.src='https://via.placeholder.com/200x200?text=Sims-Tech'">
+            <h1><?php echo htmlspecialchars($company['name'] ?? 'Sims-Tech Zambia'); ?></h1>
+            <p><?php echo htmlspecialchars($company['tagline'] ?? 'We sale New and Preowned Laptops from UK and Provide Repair Service for all types of Computers and Phones'); ?></p>
             <div class="hero-buttons">
                 <a href="#products" class="btn btn-bright-orange"><i class="fas fa-shopping-cart"></i> Shop Now</a>
                 <a href="#services" class="btn btn-bright-green"><i class="fas fa-tools"></i> Our Services</a>
@@ -711,11 +711,11 @@ $categories_result = $conn->query("
         <div class="container">
             <div class="about-content">
                 <div class="about-image" data-animate="slideInLeft">
-                    <img src="assets/images/logo.png" alt="About AC-TECHNOLOGY" style="max-width: 400px; margin: 0 auto; display: block;" onerror="this.src='https://via.placeholder.com/400x300?text=AC-TECH'">
+                    <img src="assets/images/sims-tech-logo.jpg" alt="About Sims-Tech Zambia" style="max-width: 400px; margin: 0 auto; display: block;" onerror="this.src='https://via.placeholder.com/400x300?text=Sims-Tech'">
                 </div>
                 <div class="about-text" data-animate="slideInRight">
-                    <h2>About <?php echo htmlspecialchars($company['name'] ?? 'AC-TECHNOLOGY'); ?></h2>
-                    <p><?php echo nl2br(htmlspecialchars($company['about_us'] ?? 'AC-TECHNOLOGY is a leading technology solutions provider offering quality electronics, computer accessories, and professional repair services. We are committed to delivering excellent products and services to our valued customers.')); ?></p>
+                    <h2>About <?php echo htmlspecialchars($company['name'] ?? 'Sims-Tech Zambia'); ?></h2>
+                    <p><?php echo nl2br(htmlspecialchars($company['about_us'] ?? 'Sims-Tech Zambia is a leading technology solutions provider offering quality electronics, computer accessories, and professional repair services. We are committed to delivering excellent products and services to our valued customers.')); ?></p>
                     <p>We specialize in laptops, power accessories, storage devices, and offer expert repair services for all your electronic devices.</p>
                     <div class="about-features">
                         <div class="about-feature">
@@ -820,8 +820,8 @@ $categories_result = $conn->query("
         <div class="container">
             <div class="footer-content">
                 <div class="footer-section">
-                    <h3><?php echo htmlspecialchars($company['name'] ?? 'AC-TECHNOLOGY'); ?></h3>
-                    <p><?php echo htmlspecialchars($company['tagline'] ?? 'Your trusted technology partner for quality electronics and professional services.'); ?></p>
+                    <h3><?php echo htmlspecialchars($company['name'] ?? 'Sims-Tech Zambia'); ?></h3>
+                    <p><?php echo htmlspecialchars($company['tagline'] ?? 'We sale New and Preowned Laptops from UK and Provide Repair Service for all types of Computers and Phones'); ?></p>
                     <div class="social-links">
                         <a href="<?php echo htmlspecialchars($company['facebook'] ?? '#'); ?>"><i class="fab fa-facebook-f"></i></a>
                         <a href="<?php echo htmlspecialchars($company['twitter'] ?? '#'); ?>"><i class="fab fa-twitter"></i></a>
@@ -857,7 +857,7 @@ $categories_result = $conn->query("
                 </div>
             </div>
             <div class="footer-bottom">
-                <p>&copy; <?php echo date('Y'); ?> <?php echo htmlspecialchars($company['name'] ?? 'AC-TECHNOLOGY'); ?>. All Rights Reserved.</p>
+                <p>&copy; <?php echo date('Y'); ?> <?php echo htmlspecialchars($company['name'] ?? 'Sims-Tech Zambia'); ?>. All Rights Reserved.</p>
             </div>
         </div>
     </footer>

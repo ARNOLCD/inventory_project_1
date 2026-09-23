@@ -1,5 +1,7 @@
 <?php
 require_once 'config/database.php';
+require_once 'config/session.php';
+requireAdmin();
 $conn = getDBConnection();
 
 header('Content-Type: text/html; charset=utf-8');

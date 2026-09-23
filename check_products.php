@@ -1,5 +1,7 @@
 <?php
 require_once 'config/database.php';
+require_once 'config/session.php';
+requireStaff();
 $conn = getDBConnection();
 
 echo "<h3>Current SSD Products:</h3>";

@@ -32,7 +32,7 @@ $delivered_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE custome
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Customer Dashboard - AC-TECHNOLOGY</title>
+    <title>Customer Dashboard - Sims-Tech Zambia</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -198,7 +198,7 @@ $delivered_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE custome
     <div class="customer-container">
         <div class="customer-header">
             <div class="customer-info">
-                <img src="assets/images/logo.png" alt="AC-TECHNOLOGY Logo" onerror="this.style.display='none'" style="max-height: 40px; margin-bottom: 10px;">
+                <img src="assets/images/sims-tech-logo.jpg" alt="Sims-Tech Zambia Logo" onerror="this.style.display='none'" style="max-height: 40px; margin-bottom: 10px;">
                 <h1>Welcome, <?php echo htmlspecialchars($user['full_name']); ?></h1>
                 <p><?php echo htmlspecialchars($user['email'] ?? ''); ?> | <?php echo htmlspecialchars($user['phone'] ?? ''); ?></p>
             </div>

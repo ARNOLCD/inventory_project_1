@@ -126,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <body>
                 <div class='container'>
                     <div class='header'>
-                        <h1>AC-TECHNOLOGY</h1>
+                        <h1>Sims-Tech Zambia</h1>
                         <p>Repair Booking Confirmed</p>
                     </div>
                     <div class='content'>
@@ -155,7 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </p>
                     </div>
                     <div class='footer'>
-                        <p>&copy; " . date('Y') . " AC-TECHNOLOGY. All rights reserved.</p>
+                        <p>&copy; " . date('Y') . " Sims-Tech Zambia. All rights reserved.</p>
                         <p>For questions, contact us at info@actechnology.co.zm</p>
                     </div>
                 </div>
@@ -174,7 +174,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Book Repair - AC-TECHNOLOGY</title>
+    <title>Book Repair - Sims-Tech Zambia</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -222,7 +222,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
     <div class="customer-container">
         <div class="customer-header">
-            <img src="assets/images/logo.png" alt="AC-TECHNOLOGY Logo" onerror="this.style.display='none'" style="max-height: 60px; margin-bottom: 15px;">
+            <img src="assets/images/sims-tech-logo.jpg" alt="Sims-Tech Zambia Logo" onerror="this.style.display='none'" style="max-height: 60px; margin-bottom: 15px;">
             <h1><i class="fas fa-tools"></i> Book a Repair</h1>
             <p>Submit your device for repair service</p>
         </div>
