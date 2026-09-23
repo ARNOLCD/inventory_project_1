@@ -76,9 +76,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $device_model = trim($_POST['device_model']);
     $serial_number = trim($_POST['serial_number']);
     $problem_description = trim($_POST['problem_description']);
+    $contact_email = trim($_POST['contact_email']);
+    $contact_phone = trim($_POST['contact_phone']);
     
-    if (empty($device_type) || empty($problem_description)) {
-        $error = 'Device type and problem description are required.';
+    if (empty($device_type) || empty($problem_description) || empty($contact_email) || empty($contact_phone)) {
+        $error = 'Device type, problem description, email, and phone are required.';
     } else {
         $ticket_number = generateTicketNumber($conn);
         
@@ -96,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         $stmt = $conn->prepare("INSERT INTO repairs (ticket_number, customer_name, customer_phone, customer_email, customer_id, device_type, device_brand, device_model, serial_number, item_photo, problem_description, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'booked')");
-        $stmt->bind_param("sssssisssss", $ticket_number, $user['full_name'], $user['phone'], $user['email'], $user['id'], $device_type, $device_brand, $device_model, $serial_number, $item_photo, $problem_description);
+        $stmt->bind_param("sssssisssss", $ticket_number, $user['full_name'], $contact_phone, $contact_email, $user['id'], $device_type, $device_brand, $device_model, $serial_number, $item_photo, $problem_description);
         
         if ($stmt->execute()) {
             $message = "Repair ticket $ticket_number created successfully! We will contact you soon.";
@@ -140,6 +142,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <p><strong>Device:</strong> $deviceInfo</p>
                             <p><strong>Serial Number:</strong> " . ($serial_number ?: 'Not provided') . "</p>
                             <p><strong>Problem:</strong> $problem_description</p>
+                            <p><strong>Contact Email:</strong> $contact_email</p>
+                            <p><strong>Contact Phone:</strong> $contact_phone</p>
                             <p><strong>Status:</strong> Booked</p>
                             <p><strong>Date:</strong> " . date('M d, Y H:i') . "</p>
                         </div>
@@ -158,7 +162,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </body>
             </html>";
             
-            sendEmail($user['email'], $subject, $body);
+            sendEmail($contact_email, $subject, $body);
         } else {
             $error = 'Error creating repair ticket. Please try again.';
         }
@@ -301,13 +305,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                     
                     <div class="form-group">
-                        <label>Email</label>
-                        <input type="email" class="form-control" value="<?php echo htmlspecialchars($user['email'] ?? ''); ?>" readonly>
+                        <label>Email *</label>
+                        <input type="email" name="contact_email" class="form-control" value="<?php echo htmlspecialchars($user['email'] ?? ''); ?>" required>
                     </div>
                     
                     <div class="form-group">
-                        <label>Phone</label>
-                        <input type="tel" class="form-control" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>" readonly>
+                        <label>Phone *</label>
+                        <input type="tel" name="contact_phone" class="form-control" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>" required>
                     </div>
                 </div>
                 

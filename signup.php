@@ -5,7 +5,11 @@ require_once 'config/email.php';
 
 // Redirect if already logged in
 if (isLoggedIn()) {
-    header('Location: dashboard.php');
+    if (isCustomer()) {
+        header('Location: customer_dashboard.php');
+    } else {
+        header('Location: dashboard.php');
+    }
     exit();
 }
 
