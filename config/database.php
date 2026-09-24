@@ -1,5 +1,5 @@
 <?php
-// Database configuration for AC-TECHNOLOGY Inventory Management System
+// Database configuration for Sims-Tech Zambia Inventory Management System
 // Schema is defined in mysql/database.sql — import it via phpMyAdmin or CLI before first use.
 define('DB_HOST', 'localhost');
 define('DB_USER', 'root');
@@ -7,7 +7,7 @@ define('DB_PASS', '');
 define('DB_NAME', 'actech_inventory');
 
 // Create connection
-$conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
+$conn = new mysqli(\DB_HOST, \DB_USER, \DB_PASS, \DB_NAME);
 
 // Check connection
 if ($conn->connect_error) {
@@ -25,7 +25,7 @@ function generateInvoiceNumber($conn) {
     $prefix = 'INV-' . date('Ymd') . '-';
     $result = $conn->query("SELECT COUNT(*) as count FROM sales WHERE DATE(sale_date) = CURDATE()");
     $row = $result->fetch_assoc();
-    return $prefix . str_pad($row['count'] + 1, 4, '0', STR_PAD_LEFT);
+    return $prefix . str_pad($row['count'] + 1, 4, '0', \STR_PAD_LEFT);
 }
 
 // Function to generate document number
@@ -38,6 +38,6 @@ function generateDocumentNumber($conn, $type) {
     $prefix = $prefixes[$type] . '-' . date('Ymd') . '-';
     $result = $conn->query("SELECT COUNT(*) as count FROM documents WHERE document_type = '$type' AND DATE(created_at) = CURDATE()");
     $row = $result->fetch_assoc();
-    return $prefix . str_pad($row['count'] + 1, 4, '0', STR_PAD_LEFT);
+    return $prefix . str_pad($row['count'] + 1, 4, '0', \STR_PAD_LEFT);
 }
 ?>

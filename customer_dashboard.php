@@ -26,6 +26,9 @@ $booked_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE customer_i
 $in_progress_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE customer_id = {$user['id']} AND status = 'in_progress'")->fetch_assoc()['c'];
 $completed_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE customer_id = {$user['id']} AND status = 'completed'")->fetch_assoc()['c'];
 $delivered_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE customer_id = {$user['id']} AND status = 'delivered'")->fetch_assoc()['c'];
+
+// Get shopping cart count from localStorage (simulated)
+$cart_count = 0; // This would be dynamic in a real implementation
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -203,7 +206,10 @@ $delivered_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE custome
                 <p><?php echo htmlspecialchars($user['email'] ?? ''); ?> | <?php echo htmlspecialchars($user['phone'] ?? ''); ?></p>
             </div>
             <div class="customer-actions">
-                <a href="customer_book_repair.php" class="btn btn-primary">
+                <a href="products.php" class="btn btn-primary">
+                    <i class="fas fa-shopping-cart"></i> Shop Products
+                </a>
+                <a href="customer_book_repair.php" class="btn btn-secondary">
                     <i class="fas fa-plus"></i> Book New Repair
                 </a>
                 <a href="logout.php" class="btn btn-secondary">
@@ -211,11 +217,20 @@ $delivered_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE custome
                 </a>
             </div>
         </div>
-        
+
         <!-- Stats -->
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-icon blue">
+                    <i class="fas fa-shopping-cart"></i>
+                </div>
+                <div class="stat-info">
+                    <h3 id="cartCount"><?php echo $cart_count; ?></h3>
+                    <p>Cart Items</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon orange">
                     <i class="fas fa-clipboard-list"></i>
                 </div>
                 <div class="stat-info">
@@ -224,7 +239,7 @@ $delivered_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE custome
                 </div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon orange">
+                <div class="stat-icon green">
                     <i class="fas fa-wrench"></i>
                 </div>
                 <div class="stat-info">
@@ -233,7 +248,7 @@ $delivered_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE custome
                 </div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon green">
+                <div class="stat-icon purple">
                     <i class="fas fa-check-circle"></i>
                 </div>
                 <div class="stat-info">
@@ -241,17 +256,8 @@ $delivered_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE custome
                     <p>Completed</p>
                 </div>
             </div>
-            <div class="stat-card">
-                <div class="stat-icon purple">
-                    <i class="fas fa-hand-holding"></i>
-                </div>
-                <div class="stat-info">
-                    <h3><?php echo $delivered_count; ?></h3>
-                    <p>Delivered</p>
-                </div>
-            </div>
         </div>
-        
+
         <!-- Repairs Section -->
         <div class="repairs-section">
             <div class="section-header">
@@ -260,7 +266,7 @@ $delivered_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE custome
                     Total: <?php echo $repairs->num_rows; ?> repairs
                 </span>
             </div>
-            
+
             <?php if ($repairs->num_rows > 0): ?>
                 <?php while ($repair = $repairs->fetch_assoc()): ?>
                     <div class="repair-card">
@@ -278,11 +284,11 @@ $delivered_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE custome
                                 <?php echo ucfirst(str_replace('_', ' ', $repair['status'])); ?>
                             </span>
                         </div>
-                        
+
                         <div class="progress-bar">
                             <div class="progress-fill <?php echo $repair['status']; ?>"></div>
                         </div>
-                        
+
                         <div class="repair-details">
                             <p><strong>Problem:</strong> <?php echo htmlspecialchars($repair['problem_description']); ?></p>
                             <p><strong>Submitted:</strong> <?php echo date('M d, Y H:i', strtotime($repair['created_at'])); ?></p>
@@ -309,5 +315,19 @@ $delivered_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE custome
             <?php endif; ?>
         </div>
     </div>
+
+    <script>
+        // Update cart count from localStorage
+        function updateCartCount() {
+            const cart = JSON.parse(localStorage.getItem('customer_cart')) || [];
+            document.getElementById('cartCount').textContent = cart.length;
+        }
+
+        // Update cart count on page load
+        updateCartCount();
+
+        // Update cart count periodically (in case it changes in other tabs)
+        setInterval(updateCartCount, 1000);
+    </script>
 </body>
 </html>

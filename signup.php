@@ -67,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     // Send welcome email
                     $loginLink = SYSTEM_URL . "/login.php";
-                    $subject = "Welcome to AC-TECHNOLOGY - Customer Account Created";
+                    $subject = "Welcome to Sims-Tech Zambia - Customer Account Created";
                     
                     $body = "
                     <html>

@@ -11,7 +11,6 @@ if (basename($_SERVER['PHP_SELF']) === basename(__FILE__)) {
 // Block customer access to staff pages - additional protection
 $customer_blocked_pages = [
     'dashboard.php',
-    'products.php', 
     'categories.php',
     'services.php',
     'pos.php',

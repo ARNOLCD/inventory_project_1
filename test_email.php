@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Please enter an email address to test.';
     } else {
         // Send test email
-        $subject = 'Email Test - AC-TECHNOLOGY Inventory System';
+        $subject = 'Email Test - Sims-Tech Zambia Inventory System';
         $body = "
         <html>
         <head>
@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <body>
             <div class='container'>
                 <div class='header'>
-                    <h1>AC-TECHNOLOGY</h1>
+                    <h1>Sims-Tech Zambia</h1>
                     <p>Inventory Management System</p>
                 </div>
                 <div class='content'>
@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <p><strong>From Email:</strong> " . SMTP_FROM_EMAIL . "</p>
                 </div>
                 <div class='footer'>
-                    <p>&copy; " . date('Y') . " AC-TECHNOLOGY. All rights reserved.</p>
+                    <p>&copy; " . date('Y') . " Sims-Tech Zambia. All rights reserved.</p>
                 </div>
             </div>
         </body>
@@ -65,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Email Configuration Test - AC-TECHNOLOGY</title>
+    <title>Email Configuration Test - Sims-Tech Zambia</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -144,7 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <li><strong>Enable 2-Factor Authentication</strong> in your Google Account settings</li>
                     <li><strong>Generate App Password:</strong> Go to <a href="https://myaccount.google.com/apppasswords" target="_blank">myaccount.google.com/apppasswords</a></li>
                     <li>Select "Mail" for app and "Other (Custom name)" for device</li>
-                    <li>Enter "AC-TECHNOLOGY Inventory" as the name</li>
+                    <li>Enter "Sims-Tech Zambia Inventory" as the name</li>
                     <li><strong>Copy the 16-character password</strong> and update the SMTP_PASSWORD in config/email.php</li>
                     <li>Update SMTP_USERNAME and SMTP_FROM_EMAIL with your Gmail address</li>
                 </ol>

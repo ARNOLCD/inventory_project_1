@@ -43,7 +43,7 @@ $created = isset($_GET['created']);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $type_titles[$document['document_type']]; ?> <?php echo htmlspecialchars($document['document_number']); ?> - AC-TECHNOLOGY</title>
+    <title><?php echo $type_titles[$document['document_type']]; ?> <?php echo htmlspecialchars($document['document_number']); ?> - Sims-Tech Zambia</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -519,11 +519,11 @@ $created = isset($_GET['created']);
                     <div class="doc-header-wave">
                         <div class="doc-header-content">
                             <div class="doc-company-title">
-                                <h1>AC-TECHNOLOGY LIMITED</h1>
+                                <h1>Sims-Tech Zambia LIMITED</h1>
                                 <p>SAVINGS THROUGH MAINTENANCE OF YOUR COMPUTERS</p>
                             </div>
                             <div class="doc-logo">
-                                <img src="assets/images/logo.png" alt="AC-TECHNOLOGY Logo" onerror="this.parentElement.innerHTML='<div class=\'doc-logo-text\'>AC<span>TECH</span></div>'">
+                                <img src="assets/images/logo.png" alt="Sims-Tech Zambia Logo" onerror="this.parentElement.innerHTML='<div class=\'doc-logo-text\'>AC<span>TECH</span></div>'">
                             </div>
                         </div>
                     </div>
@@ -548,7 +548,7 @@ $created = isset($_GET['created']);
                             <div class="bank-section">
                                 <h4>BANK DETAILS</h4>
                                 <p><strong>BANK:</strong> <?php echo htmlspecialchars($company['bank_name'] ?? 'STANBIC'); ?></p>
-                                <p><strong>ACCOUNT NAME:</strong> <?php echo htmlspecialchars($company['account_name'] ?? 'AC-TECHNOLOGY'); ?></p>
+                                <p><strong>ACCOUNT NAME:</strong> <?php echo htmlspecialchars($company['account_name'] ?? 'Sims-Tech Zambia'); ?></p>
                                 <p><strong>Account No:</strong> <?php echo htmlspecialchars($company['account_number'] ?? '6292984114'); ?></p>
                                 <p><strong>BRANCH:</strong> <?php echo htmlspecialchars($company['branch'] ?? '260006'); ?></p>
                                 <p><strong>PAY TO SALE:</strong> <?php echo htmlspecialchars($company['pay_to_sale'] ?? '0973071800'); ?></p>
@@ -617,7 +617,7 @@ $created = isset($_GET['created']);
                         
                         <!-- Footer -->
                         <div class="doc-footer">
-                            <p><strong>AC-TECHNOLOGY LIMITED</strong></p>
+                            <p><strong>Sims-Tech Zambia LIMITED</strong></p>
                             
                             <?php if ($document['notes']): ?>
                                 <p style="margin-top: 15px;"><strong>Notes:</strong> <?php echo nl2br(htmlspecialchars($document['notes'])); ?></p>

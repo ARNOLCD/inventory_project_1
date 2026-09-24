@@ -1,6 +1,6 @@
 # MySQL Database Setup
 
-This folder contains the SQL scripts for the AC-TECHNOLOGY Inventory Management System.
+This folder contains the SQL scripts for the Sims-Tech Zambia Inventory Management System.
 
 ## Files
 

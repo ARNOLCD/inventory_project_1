@@ -105,7 +105,7 @@ function performBackup($conn, $backup_dir) {
         $tables[] = $row[0];
     }
     
-    $sql = "-- AC-TECHNOLOGY Inventory System Database Backup\n";
+    $sql = "-- Sims-Tech Zambia Inventory System Database Backup\n";
     $sql .= "-- Generated: " . date('Y-m-d H:i:s') . "\n";
     $sql .= "-- Database: " . DB_NAME . "\n\n";
     $sql .= "SET FOREIGN_KEY_CHECKS=0;\n\n";
@@ -176,7 +176,7 @@ $admin_email = getBackupSetting($conn, 'admin_email', '');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Database Backup - AC-TECHNOLOGY</title>
+    <title>Database Backup - Sims-Tech Zambia</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">

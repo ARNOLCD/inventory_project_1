@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </table>
             </div>
             <div style="background: #edf2f7; padding: 15px; border-radius: 0 0 8px 8px; text-align: center; font-size: 12px; color: #718096;">
-                <p>This message was sent from the AC-TECHNOLOGY website contact form.</p>
+                <p>This message was sent from the Sims-Tech Zambia website contact form.</p>
                 <p>You can reply directly to <a href="mailto:' . htmlspecialchars($email) . '">' . htmlspecialchars($email) . '</a></p>
             </div>
         </div>';
@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Contact - AC-TECHNOLOGY</title>
+    <title>Contact - Sims-Tech Zambia</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">

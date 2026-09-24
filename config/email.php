@@ -1,5 +1,5 @@
 <?php
-// Email Configuration for AC-TECHNOLOGY Inventory System
+// Email Configuration for Sims-Tech Zambia Inventory System
 // Uses SMTP for sending emails
 
 // Email Settings - Update these with your SMTP credentials
@@ -8,7 +8,7 @@ define('SMTP_PORT', 587);                        // SMTP port (587 for TLS, 465 
 define('SMTP_USERNAME', 'Arnoldchama36@gmail.com'); // Your email address
 define('SMTP_PASSWORD', 'djfvfrvcfmueidsz');    // App password (not regular password)
 define('SMTP_FROM_EMAIL', 'Arnoldchama36@gmail.com');
-define('SMTP_FROM_NAME', 'AC-TECHNOLOGY');
+define('SMTP_FROM_NAME', 'Sims-Tech Zambia');
 define('SMTP_ENCRYPTION', 'tls');                // 'tls' or 'ssl'
 
 // System URL for links in emails
@@ -213,7 +213,7 @@ function logEmailAttempt($to, $subject, $success) {
 function sendPasswordResetEmail($email, $username, $resetToken) {
     $resetLink = SYSTEM_URL . "/reset_password.php?token=" . $resetToken;
     
-    $subject = "Password Reset Request - AC-TECHNOLOGY";
+    $subject = "Password Reset Request - Sims-Tech Zambia";
     
     $body = "
     <html>
@@ -230,7 +230,7 @@ function sendPasswordResetEmail($email, $username, $resetToken) {
     <body>
         <div class='container'>
             <div class='header'>
-                <h1>AC-TECHNOLOGY</h1>
+                <h1>Sims-Tech Zambia</h1>
                 <p>Inventory Management System</p>
             </div>
             <div class='content'>
@@ -246,7 +246,7 @@ function sendPasswordResetEmail($email, $username, $resetToken) {
                 <p>If you didn't request this, please ignore this email.</p>
             </div>
             <div class='footer'>
-                <p>&copy; " . date('Y') . " AC-TECHNOLOGY. All rights reserved.</p>
+                <p>&copy; " . date('Y') . " Sims-Tech Zambia. All rights reserved.</p>
             </div>
         </div>
     </body>
@@ -261,7 +261,7 @@ function sendPasswordResetEmail($email, $username, $resetToken) {
 function sendNewUserEmail($email, $username, $password, $fullName) {
     $loginLink = SYSTEM_URL . "/login.php";
     
-    $subject = "Welcome to AC-TECHNOLOGY - Your Account Details";
+    $subject = "Welcome to Sims-Tech Zambia - Your Account Details";
     
     $body = "
     <html>
@@ -281,7 +281,7 @@ function sendNewUserEmail($email, $username, $password, $fullName) {
     <body>
         <div class='container'>
             <div class='header'>
-                <h1>AC-TECHNOLOGY</h1>
+                <h1>Sims-Tech Zambia</h1>
                 <p>Inventory Management System</p>
             </div>
             <div class='content'>
@@ -305,7 +305,7 @@ function sendNewUserEmail($email, $username, $password, $fullName) {
                 <p>If you have any questions, please contact your system administrator.</p>
             </div>
             <div class='footer'>
-                <p>&copy; " . date('Y') . " AC-TECHNOLOGY. All rights reserved.</p>
+                <p>&copy; " . date('Y') . " Sims-Tech Zambia. All rights reserved.</p>
             </div>
         </div>
     </body>
@@ -376,7 +376,7 @@ function sendRepairStatusEmail($customerEmail, $customerName, $ticketNumber, $st
     <body>
         <div class='container'>
             <div class='header'>
-                <h1>AC-TECHNOLOGY</h1>
+                <h1>Sims-Tech Zambia</h1>
                 <p>Repair Status Update</p>
             </div>
             <div class='content'>
@@ -399,7 +399,7 @@ function sendRepairStatusEmail($customerEmail, $customerName, $ticketNumber, $st
                 <p>You can track your repair status by logging into your account.</p>
             </div>
             <div class='footer'>
-                <p>&copy; " . date('Y') . " AC-TECHNOLOGY. All rights reserved.</p>
+                <p>&copy; " . date('Y') . " Sims-Tech Zambia. All rights reserved.</p>
                 <p>For questions, contact us at info@actechnology.co.zm</p>
             </div>
         </div>
@@ -413,7 +413,7 @@ function sendRepairStatusEmail($customerEmail, $customerName, $ticketNumber, $st
  * Send backup notification email
  */
 function sendBackupNotificationEmail($adminEmail, $backupFile, $backupSize, $status) {
-    $subject = "Database Backup " . ($status ? "Successful" : "Failed") . " - AC-TECHNOLOGY";
+    $subject = "Database Backup " . ($status ? "Successful" : "Failed") . " - Sims-Tech Zambia";
     
     $statusText = $status ? "completed successfully" : "failed";
     $statusColor = $status ? "#48bb78" : "#fc8181";
@@ -434,7 +434,7 @@ function sendBackupNotificationEmail($adminEmail, $backupFile, $backupSize, $sta
     <body>
         <div class='container'>
             <div class='header'>
-                <h1>AC-TECHNOLOGY</h1>
+                <h1>Sims-Tech Zambia</h1>
                 <p>Database Backup Notification</p>
             </div>
             <div class='content'>
@@ -449,7 +449,7 @@ function sendBackupNotificationEmail($adminEmail, $backupFile, $backupSize, $sta
                 </div>
             </div>
             <div class='footer'>
-                <p>&copy; " . date('Y') . " AC-TECHNOLOGY. All rights reserved.</p>
+                <p>&copy; " . date('Y') . " Sims-Tech Zambia. All rights reserved.</p>
             </div>
         </div>
     </body>

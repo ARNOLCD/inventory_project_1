@@ -86,7 +86,7 @@ $smtp_port = getEmailSetting($conn, 'smtp_port', '587');
 $smtp_username = getEmailSetting($conn, 'smtp_username', '');
 $smtp_password = getEmailSetting($conn, 'smtp_password', '');
 $smtp_from_email = getEmailSetting($conn, 'smtp_from_email', '');
-$smtp_from_name = getEmailSetting($conn, 'smtp_from_name', 'AC-TECHNOLOGY');
+$smtp_from_name = getEmailSetting($conn, 'smtp_from_name', 'Sims-Tech Zambia');
 $smtp_encryption = getEmailSetting($conn, 'smtp_encryption', 'tls');
 ?>
 <!DOCTYPE html>
@@ -94,7 +94,7 @@ $smtp_encryption = getEmailSetting($conn, 'smtp_encryption', 'tls');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Email Settings - AC-TECHNOLOGY</title>
+    <title>Email Settings - Sims-Tech Zambia</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -205,7 +205,7 @@ $smtp_encryption = getEmailSetting($conn, 'smtp_encryption', 'tls');
                                 <label for="smtp_from_name"><i class="fas fa-building"></i> From Name</label>
                                 <input type="text" id="smtp_from_name" name="smtp_from_name" required 
                                        value="<?php echo htmlspecialchars($smtp_from_name); ?>"
-                                       placeholder="AC-TECHNOLOGY">
+                                       placeholder="Sims-Tech Zambia">
                             </div>
                         </div>
                         
@@ -232,7 +232,7 @@ $smtp_encryption = getEmailSetting($conn, 'smtp_encryption', 'tls');
                         <ol>
                             <li>Enable 2-Factor Authentication in your Google Account</li>
                             <li>Go to <a href="https://myaccount.google.com/apppasswords" target="_blank">App Passwords</a></li>
-                            <li>Select "Mail" + "Other (Custom name)" → Enter "AC-TECHNOLOGY Inventory"</li>
+                            <li>Select "Mail" + "Other (Custom name)" → Enter "Sims-Tech Zambia Inventory"</li>
                             <li>Copy the 16-character password and use it as SMTP Password</li>
                         </ol>
                     </div>

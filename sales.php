@@ -407,7 +407,7 @@ $employees = $conn->query("SELECT id, full_name FROM users ORDER BY full_name AS
                 </head>
                 <body>
                     <div class="company-info">
-                        <h2>AC-TECHNOLOGY</h2>
+                        <h2>Sims-Tech Zambia</h2>
                         <p>Your Trusted Technology Partner</p>
                     </div>
                     ${content}

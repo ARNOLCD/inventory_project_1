@@ -1,4 +1,4 @@
-// AC-TECHNOLOGY Inventory Management System - Main JavaScript
+// Sims-Tech Zambia Inventory Management System - Main JavaScript
 
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize all components

@@ -96,7 +96,7 @@ $html = '
         <table style="width: 100%; margin-bottom: 20px; border-bottom: 3px solid #1a365d; padding-bottom: 15px;">
             <tr>
                 <td style="vertical-align: top;">
-                    <div style="font-size: 24px; font-weight: bold; color: #1a365d;">AC-TECHNOLOGY LIMITED</div>
+                    <div style="font-size: 24px; font-weight: bold; color: #1a365d;">Sims-Tech Zambia LIMITED</div>
                     <div style="font-size: 10px; color: #666; font-style: italic;">SAVINGS THROUGH MAINTENANCE OF YOUR COMPUTERS</div>
                 </td>
                 <td style="text-align: right; vertical-align: top;">
@@ -125,7 +125,7 @@ $html = '
                 <td style="vertical-align: top; width: 50%;">
                     <div class="bank-title">BANK DETAILS</div>
                     <p><strong>BANK:</strong> ' . htmlspecialchars($company['bank_name'] ?? 'STANBIC') . '</p>
-                    <p><strong>ACCOUNT NAME:</strong> ' . htmlspecialchars($company['account_name'] ?? 'AC-TECHNOLOGY') . '</p>
+                    <p><strong>ACCOUNT NAME:</strong> ' . htmlspecialchars($company['account_name'] ?? 'Sims-Tech Zambia') . '</p>
                     <p><strong>Account No:</strong> ' . htmlspecialchars($company['account_number'] ?? '6292984114') . '</p>
                     <p><strong>BRANCH:</strong> ' . htmlspecialchars($company['branch'] ?? '260006') . '</p>
                     <p><strong>PAY TO SALE:</strong> ' . htmlspecialchars($company['pay_to_sale'] ?? '0973071800') . '</p>
@@ -204,7 +204,7 @@ $html .= '
         </table>
         
         <div class="footer">
-            <p><strong>AC-TECHNOLOGY LIMITED</strong></p>';
+            <p><strong>Sims-Tech Zambia LIMITED</strong></p>';
 
 if ($document['notes']) {
     $html .= '<p style="margin-top: 10px;"><strong>Notes:</strong> ' . nl2br(htmlspecialchars($document['notes'])) . '</p>';
@@ -318,7 +318,7 @@ if (file_exists('vendor/autoload.php')) {
         <table class="header-table">
             <tr>
                 <td style="vertical-align: top;">
-                    <div class="company-name">AC-TECHNOLOGY LIMITED</div>
+                    <div class="company-name">Sims-Tech Zambia LIMITED</div>
                     <div class="tagline">SAVINGS THROUGH MAINTENANCE OF YOUR COMPUTERS</div>
                 </td>
                 <td style="text-align: right; vertical-align: top;">
@@ -347,7 +347,7 @@ if (file_exists('vendor/autoload.php')) {
                 <td style="vertical-align: top; width: 50%;">
                     <div class="bank-title">BANK DETAILS</div>
                     <p><strong>BANK:</strong> <?php echo htmlspecialchars($company['bank_name'] ?? 'STANBIC'); ?></p>
-                    <p><strong>ACCOUNT NAME:</strong> <?php echo htmlspecialchars($company['account_name'] ?? 'AC-TECHNOLOGY'); ?></p>
+                    <p><strong>ACCOUNT NAME:</strong> <?php echo htmlspecialchars($company['account_name'] ?? 'Sims-Tech Zambia'); ?></p>
                     <p><strong>Account No:</strong> <?php echo htmlspecialchars($company['account_number'] ?? '6292984114'); ?></p>
                     <p><strong>BRANCH:</strong> <?php echo htmlspecialchars($company['branch'] ?? '260006'); ?></p>
                     <p><strong>PAY TO SALE:</strong> <?php echo htmlspecialchars($company['pay_to_sale'] ?? '0973071800'); ?></p>
@@ -413,7 +413,7 @@ if (file_exists('vendor/autoload.php')) {
         </table>
         
         <div class="footer">
-            <p><strong>AC-TECHNOLOGY LIMITED</strong></p>
+            <p><strong>Sims-Tech Zambia LIMITED</strong></p>
             
             <?php if ($document['notes']): ?>
                 <p style="margin-top: 10px;"><strong>Notes:</strong> <?php echo nl2br(htmlspecialchars($document['notes'])); ?></p>

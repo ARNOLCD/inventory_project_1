@@ -1,4 +1,4 @@
--- AC-TECHNOLOGY Inventory Management System
+-- Sims-Tech Zambia Inventory Management System
 -- Database Schema
 -- MySQL Database Setup Script
 
@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS sale_items (
 -- =====================================================
 CREATE TABLE IF NOT EXISTS company_info (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(200) DEFAULT 'AC-TECHNOLOGY',
+    name VARCHAR(200) DEFAULT 'Sims-Tech Zambia',
     tagline VARCHAR(255),
     about_us TEXT,
     address TEXT,
@@ -292,16 +292,16 @@ ON DUPLICATE KEY UPDATE name = name;
 
 -- Insert default company info
 INSERT INTO company_info (name, tagline, about_us, address, phone, mobile, email, tpin, bank_name, account_name, account_number, branch, pay_to_sale) VALUES (
-    'AC-TECHNOLOGY',
+    'Sims-Tech Zambia',
     'SAVINGS THROUGH MAINTENANCE OF YOUR COMPUTERS',
-    'AC-TECHNOLOGY is a leading technology solutions provider offering quality electronics, computer accessories, and professional repair services. We are committed to delivering excellent products and services to our valued customers.',
+    'Sims-Tech Zambia is a leading technology solutions provider offering quality electronics, computer accessories, and professional repair services. We are committed to delivering excellent products and services to our valued customers.',
     'UNZA MAIN CAMPUS, NEXT TO THE POST OFFICE',
     '0979145428',
     '0968745131',
     'info@actechnology.co.zm',
     '2002530937',
     'STANBIC',
-    'AC-TECHNOLOGY',
+    'Sims-Tech Zambia',
     '6292984114',
     '260006',
     '0973071800'

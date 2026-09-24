@@ -12,7 +12,14 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <a href="customer_dashboard.php" class="<?php echo $current_page === 'customer_dashboard.php' ? 'active' : ''; ?>">
                 <i class="fas fa-tachometer-alt"></i> My Dashboard
             </a>
-            
+
+            <div class="menu-section">
+                <span class="menu-section-title">Shop</span>
+            </div>
+            <a href="products.php" class="<?php echo $current_page === 'products.php' ? 'active' : ''; ?>">
+                <i class="fas fa-shopping-cart"></i> Shop Products
+            </a>
+
             <div class="menu-section">
                 <span class="menu-section-title">Repairs</span>
             </div>
@@ -22,7 +29,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <a href="customer_dashboard.php" class="<?php echo $current_page === 'customer_dashboard.php' ? 'active' : ''; ?>">
                 <i class="fas fa-tools"></i> My Repairs
             </a>
-            
+
             <div class="menu-section">
                 <span class="menu-section-title">Account</span>
             </div>
@@ -34,7 +41,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <a href="dashboard.php" class="<?php echo $current_page === 'dashboard.php' ? 'active' : ''; ?>">
                 <i class="fas fa-tachometer-alt"></i> Dashboard
             </a>
-            
+
             <div class="menu-section">
                 <span class="menu-section-title">Inventory</span>
             </div>
@@ -47,7 +54,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <a href="services.php" class="<?php echo $current_page === 'services.php' ? 'active' : ''; ?>">
                 <i class="fas fa-cogs"></i> Services
             </a>
-            
+
             <div class="menu-section">
                 <span class="menu-section-title">Sales</span>
             </div>
@@ -60,14 +67,14 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <a href="reports.php" class="<?php echo $current_page === 'reports.php' ? 'active' : ''; ?>">
                 <i class="fas fa-chart-bar"></i> Reports
             </a>
-            
+
             <div class="menu-section">
                 <span class="menu-section-title">Repairs</span>
             </div>
             <a href="repairs.php" class="<?php echo $current_page === 'repairs.php' ? 'active' : ''; ?>">
                 <i class="fas fa-tools"></i> Repair Tracking
             </a>
-            
+
             <div class="menu-section">
                 <span class="menu-section-title">Documents</span>
             </div>
@@ -96,7 +103,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <a href="documents.php?type=receipt" class="<?php echo ($is_doc_page && $sidebar_doc_type === 'receipt') ? 'active' : ''; ?>">
                 <i class="fas fa-receipt"></i> Receipts
             </a>
-            
+
             <?php if (isAdmin()): ?>
             <div class="menu-section">
                 <span class="menu-section-title">Administration</span>
@@ -114,7 +121,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <i class="fas fa-envelope"></i> Email Settings
             </a>
             <?php endif; ?>
-            
+
             <div class="menu-section">
                 <span class="menu-section-title">Account</span>
             </div>
