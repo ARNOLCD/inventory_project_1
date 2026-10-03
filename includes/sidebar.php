@@ -74,6 +74,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <a href="repairs.php" class="<?php echo $current_page === 'repairs.php' ? 'active' : ''; ?>">
                 <i class="fas fa-tools"></i> Repair Tracking
             </a>
+            <a href="repair_solutions.php" class="<?php echo $current_page === 'repair_solutions.php' ? 'active' : ''; ?>">
+                <i class="fas fa-lightbulb"></i> Repair Solutions
+            </a>
 
             <div class="menu-section">
                 <span class="menu-section-title">Documents</span>

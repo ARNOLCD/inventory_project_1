@@ -24,13 +24,15 @@ $conn->query("
         repair_notes TEXT,
         estimated_cost DECIMAL(10, 2),
         final_cost DECIMAL(10, 2),
-        status ENUM('booked', 'in_progress', 'completed', 'delivered', 'cancelled') DEFAULT 'booked',
+        status ENUM('booked', 'item_received', 'in_progress', 'completed', 'in_transit', 'delivered', 'cancelled') DEFAULT 'booked',
         priority ENUM('low', 'normal', 'high', 'urgent') DEFAULT 'normal',
         received_by INT,
         technician_id INT,
         received_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        item_received_date DATETIME,
         started_date DATETIME,
         completed_date DATETIME,
+        in_transit_date DATETIME,
         delivered_date DATETIME,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -45,12 +47,62 @@ $conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS item_photo VARCHAR(25
 // Add customer_id column if not exists
 $conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS customer_id INT DEFAULT NULL AFTER customer_email");
 
+// Add new tracking columns for item delivery status
+$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS item_received_date DATETIME DEFAULT NULL AFTER received_date");
+$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS in_transit_date DATETIME DEFAULT NULL AFTER completed_date");
+
+// Update status ENUM to include new statuses (requires modifying the column)
+try {
+    $conn->query("ALTER TABLE repairs MODIFY COLUMN status ENUM('booked', 'item_received', 'in_progress', 'completed', 'in_transit', 'delivered', 'cancelled') DEFAULT 'booked'");
+} catch (Exception $e) {
+    // Column might already have the updated enum, ignore error
+}
+
 // Add foreign key constraint for customer_id if not exists (safe approach)
 try {
     $conn->query("ALTER TABLE repairs ADD CONSTRAINT fk_repairs_customer FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE SET NULL");
 } catch (Exception $e) {
     // Foreign key might already exist, ignore error
 }
+
+// Create repair_solutions table for storing technician solutions
+// First create table without foreign keys
+$conn->query("
+    CREATE TABLE IF NOT EXISTS repair_solutions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        repair_id INT NOT NULL,
+        technician_id INT NOT NULL,
+        problem_keywords TEXT,
+        solution_description TEXT NOT NULL,
+        steps_taken TEXT,
+        parts_used TEXT,
+        time_required VARCHAR(100),
+        difficulty_level ENUM('easy', 'medium', 'hard', 'expert') DEFAULT 'medium',
+        success_rate INT DEFAULT 100,
+        tags VARCHAR(255),
+        is_verified BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+");
+
+// Add foreign keys separately (safe approach)
+try {
+    $conn->query("ALTER TABLE repair_solutions ADD CONSTRAINT fk_repair_solutions_repair FOREIGN KEY (repair_id) REFERENCES repairs(id) ON DELETE CASCADE");
+} catch (Exception $e) {
+    // Foreign key might already exist, ignore error
+}
+
+try {
+    $conn->query("ALTER TABLE repair_solutions ADD CONSTRAINT fk_repair_solutions_technician FOREIGN KEY (technician_id) REFERENCES users(id) ON DELETE SET NULL");
+} catch (Exception $e) {
+    // Foreign key might already exist, ignore error
+}
+
+// Add payment columns to repairs table if not exists
+$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50) DEFAULT NULL AFTER final_cost");
+$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS payment_status ENUM('pending', 'paid', 'refunded') DEFAULT 'pending' AFTER payment_method");
+$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS payment_date DATETIME DEFAULT NULL AFTER payment_status");
 
 // Create uploads directory for repair photos
 $repair_upload_dir = 'uploads/repairs/';
@@ -116,17 +168,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id = intval($_POST['id']);
         $new_status = $_POST['status'];
         $notes = trim($_POST['notes'] ?? '');
-        
+
         // Update status and set appropriate date
         $date_field = '';
-        if ($new_status === 'in_progress') {
+        if ($new_status === 'item_received') {
+            $date_field = ", item_received_date = NOW()";
+        } elseif ($new_status === 'in_progress') {
             $date_field = ", started_date = NOW()";
         } elseif ($new_status === 'completed') {
             $date_field = ", completed_date = NOW()";
+        } elseif ($new_status === 'in_transit') {
+            $date_field = ", in_transit_date = NOW()";
         } elseif ($new_status === 'delivered') {
             $date_field = ", delivered_date = NOW()";
         }
-        
+
         $sql = "UPDATE repairs SET status = ?, repair_notes = CONCAT(IFNULL(repair_notes, ''), '\n[" . date('Y-m-d H:i') . "] Status: $new_status - ', ?) $date_field WHERE id = ?";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("ssi", $new_status, $notes, $id);
@@ -255,8 +311,10 @@ $repairs = $conn->query("
 
 // Get counts
 $booked_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE status = 'booked'")->fetch_assoc()['c'];
+$item_received_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE status = 'item_received'")->fetch_assoc()['c'];
 $in_progress_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE status = 'in_progress'")->fetch_assoc()['c'];
 $completed_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE status = 'completed'")->fetch_assoc()['c'];
+$in_transit_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE status = 'in_transit'")->fetch_assoc()['c'];
 $delivered_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE status = 'delivered'")->fetch_assoc()['c'];
 
 // Get technicians for dropdown
@@ -277,8 +335,10 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
     <style>
         body { font-family: 'Poppins', sans-serif; }
         .status-booked { background: #3182ce; color: white; }
+        .status-item_received { background: #4299e1; color: white; }
         .status-in_progress { background: #dd6b20; color: white; }
         .status-completed { background: #38a169; color: white; }
+        .status-in_transit { background: #9f7aea; color: white; }
         .status-delivered { background: #805ad5; color: white; }
         .status-cancelled { background: #e53e3e; color: white; }
         .priority-urgent { border-left: 4px solid #e53e3e; }
@@ -331,8 +391,10 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
             transition: all 0.2s;
         }
         .status-btn:hover { opacity: 0.8; }
+        .btn-receive { background: #4299e1; color: white; }
         .btn-start { background: #dd6b20; color: white; }
         .btn-complete { background: #38a169; color: white; }
+        .btn-transit { background: #9f7aea; color: white; }
         .btn-deliver { background: #805ad5; color: white; }
     </style>
 </head>
@@ -373,6 +435,15 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
                         </div>
                     </div>
                     <div class="stat-card">
+                        <div class="stat-icon" style="background: #4299e1;">
+                            <i class="fas fa-box"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3><?php echo $item_received_count; ?></h3>
+                            <p>Item Received</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
                         <div class="stat-icon orange">
                             <i class="fas fa-wrench"></i>
                         </div>
@@ -388,6 +459,15 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
                         <div class="stat-info">
                             <h3><?php echo $completed_count; ?></h3>
                             <p>Completed</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #9f7aea;">
+                            <i class="fas fa-shipping-fast"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3><?php echo $in_transit_count; ?></h3>
+                            <p>In Transit</p>
                         </div>
                     </div>
                     <div class="stat-card">
@@ -408,11 +488,17 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
                         <a href="repairs.php?status=booked" class="btn <?php echo $status_filter === 'booked' ? 'btn-primary' : 'btn-secondary'; ?> btn-sm">
                             <i class="fas fa-clipboard-list"></i> Booked
                         </a>
+                        <a href="repairs.php?status=item_received" class="btn <?php echo $status_filter === 'item_received' ? 'btn-primary' : 'btn-secondary'; ?> btn-sm">
+                            <i class="fas fa-box"></i> Item Received
+                        </a>
                         <a href="repairs.php?status=in_progress" class="btn <?php echo $status_filter === 'in_progress' ? 'btn-primary' : 'btn-secondary'; ?> btn-sm">
                             <i class="fas fa-wrench"></i> In Progress
                         </a>
                         <a href="repairs.php?status=completed" class="btn <?php echo $status_filter === 'completed' ? 'btn-primary' : 'btn-secondary'; ?> btn-sm">
                             <i class="fas fa-check-circle"></i> Completed
+                        </a>
+                        <a href="repairs.php?status=in_transit" class="btn <?php echo $status_filter === 'in_transit' ? 'btn-primary' : 'btn-secondary'; ?> btn-sm">
+                            <i class="fas fa-shipping-fast"></i> In Transit
                         </a>
                         <a href="repairs.php?status=delivered" class="btn <?php echo $status_filter === 'delivered' ? 'btn-primary' : 'btn-secondary'; ?> btn-sm">
                             <i class="fas fa-hand-holding"></i> Delivered
@@ -520,6 +606,10 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
                                     
                                     <div class="repair-actions">
                                         <?php if ($repair['status'] === 'booked'): ?>
+                                            <button class="status-btn btn-receive" onclick="updateStatus(<?php echo $repair['id']; ?>, 'item_received')">
+                                                <i class="fas fa-box"></i> Item Received
+                                            </button>
+                                        <?php elseif ($repair['status'] === 'item_received'): ?>
                                             <button class="status-btn btn-start" onclick="updateStatus(<?php echo $repair['id']; ?>, 'in_progress')">
                                                 <i class="fas fa-play"></i> Start Work
                                             </button>
@@ -528,11 +618,18 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
                                                 <i class="fas fa-check"></i> Mark Complete
                                             </button>
                                         <?php elseif ($repair['status'] === 'completed'): ?>
+                                            <button class="status-btn btn-transit" onclick="updateStatus(<?php echo $repair['id']; ?>, 'in_transit')">
+                                                <i class="fas fa-shipping-fast"></i> In Transit
+                                            </button>
+                                        <?php elseif ($repair['status'] === 'in_transit'): ?>
                                             <button class="status-btn btn-deliver" onclick="updateStatus(<?php echo $repair['id']; ?>, 'delivered')">
                                                 <i class="fas fa-hand-holding"></i> Mark Delivered
                                             </button>
                                         <?php endif; ?>
-                                        
+
+                                        <button class="action-btn" onclick="viewSolutions(<?php echo $repair['id']; ?>)" title="View Solutions" style="background: #667eea;">
+                                            <i class="fas fa-lightbulb"></i>
+                                        </button>
                                         <button class="action-btn edit" onclick='editRepair(<?php echo htmlspecialchars(json_encode($repair), ENT_QUOTES, "UTF-8"); ?>)' title="Edit">
                                             <i class="fas fa-edit"></i>
                                         </button>
@@ -786,11 +883,13 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
         
         function updateStatus(id, status) {
             const messages = {
+                'item_received': 'Mark this item as received at Sims-Tech?',
                 'in_progress': 'Start working on this repair?',
                 'completed': 'Mark this repair as completed?',
+                'in_transit': 'Mark this item as in transit to customer?',
                 'delivered': 'Mark this device as delivered to customer?'
             };
-            
+
             document.getElementById('statusRepairId').value = id;
             document.getElementById('newStatus').value = status;
             document.getElementById('statusMessage').textContent = messages[status];
@@ -845,6 +944,10 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
         
         function closeLightbox() {
             document.getElementById('photoLightbox').style.display = 'none';
+        }
+        
+        function viewSolutions(repairId) {
+            window.location.href = 'repair_solutions.php?repair_id=' + repairId;
         }
         
         // Close modals on overlay click

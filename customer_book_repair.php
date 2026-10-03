@@ -33,13 +33,15 @@ $conn->query("
         repair_notes TEXT,
         estimated_cost DECIMAL(10, 2),
         final_cost DECIMAL(10, 2),
-        status ENUM('booked', 'in_progress', 'completed', 'delivered', 'cancelled') DEFAULT 'booked',
+        status ENUM('booked', 'item_received', 'in_progress', 'completed', 'in_transit', 'delivered', 'cancelled') DEFAULT 'booked',
         priority ENUM('low', 'normal', 'high', 'urgent') DEFAULT 'normal',
         received_by INT,
         technician_id INT,
         received_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        item_received_date DATETIME,
         started_date DATETIME,
         completed_date DATETIME,
+        in_transit_date DATETIME,
         delivered_date DATETIME,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -52,6 +54,21 @@ $conn->query("
 // Add columns if not exists
 $conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS item_photo VARCHAR(255) DEFAULT NULL AFTER serial_number");
 $conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS customer_id INT DEFAULT NULL AFTER customer_email");
+
+// Add new tracking columns for item delivery status
+$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS item_received_date DATETIME DEFAULT NULL AFTER received_date");
+$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS in_transit_date DATETIME DEFAULT NULL AFTER completed_date");
+
+// Update status ENUM to include new statuses
+try {
+    $conn->query("ALTER TABLE repairs MODIFY COLUMN status ENUM('booked', 'item_received', 'in_progress', 'completed', 'in_transit', 'delivered', 'cancelled') DEFAULT 'booked'");
+} catch (Exception $e) {
+    // Column might already have the updated enum, ignore error
+}
+
+$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50) DEFAULT NULL AFTER final_cost");
+$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS payment_status ENUM('pending', 'paid', 'refunded') DEFAULT 'pending' AFTER payment_method");
+$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS payment_date DATETIME DEFAULT NULL AFTER payment_status");
 
 // Create uploads directory for repair photos
 $repair_upload_dir = 'uploads/repairs/';
@@ -152,6 +169,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         
                         <p style='text-align: center; margin-top: 20px;'>
                             <a href='" . SYSTEM_URL . "/customer_dashboard.php' style='display: inline-block; background: #48bb78; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px;'>Track Your Repair</a>
+                        </p>
+                        
+                        <p style='margin-top: 15px; font-size: 0.9rem; color: #718096; text-align: center;'>
+                            <i class='fas fa-info-circle'></i> You can track your repair status and delivery progress in your dashboard.
                         </p>
                     </div>
                     <div class='footer'>

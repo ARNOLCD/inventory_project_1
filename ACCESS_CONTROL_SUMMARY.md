@@ -3,8 +3,11 @@
 ## Customer User Access Rights
 
 ### ✅ **Customer Users CAN Access:**
-- `customer_dashboard.php` - View their repair status and history
+- `customer_dashboard.php` - View their repair status, order history, and cart
 - `customer_book_repair.php` - Book repair services for their devices
+- `repair_payment.php` - Pay for completed repairs
+- `products.php` - Browse and purchase products (customer view only)
+- `checkout.php` - Complete product purchases
 - `login.php` - Authentication
 - `signup.php` - Create customer account
 - `logout.php` - Logout
@@ -14,17 +17,17 @@
 
 ### ❌ **Customer Users CANNOT Access:**
 - `dashboard.php` - Main staff dashboard
-- `products.php` - Product inventory management
 - `categories.php` - Category management
 - `services.php` - Service management
-- `pos.php` - Point of sale system
-- `sales.php` - Sales history and management
-- `reports.php` - Business reports
-- `repairs.php` - Staff repair management
-- `documents.php` - Document management
+- `pos.php` - Point of sale system (staff only)
+- `sales.php` - Sales history and reports (staff only)
+- `reports.php` - Business reports and analytics (staff only)
+- `repairs.php` - Staff repair management (staff only)
+- `repair_solutions.php` - Technician solution documentation (staff only)
+- `documents.php` - Document management including invoices
 - `document_templates.php` - Document templates
-- `create_document.php` - Create documents
-- `view_document.php` - View documents
+- `create_document.php` - Create documents including invoices
+- `view_document.php` - View documents including invoices
 - `users.php` - User management
 - `settings.php` - System settings
 - `backup.php` - Database backup
@@ -46,6 +49,8 @@
 ### ❌ **Staff/Admin Users CANNOT Access:**
 - `customer_dashboard.php` - Customer-specific dashboard
 - `customer_book_repair.php` - Customer repair booking
+- `repair_payment.php` - Customer repair payment
+- `checkout.php` - Customer checkout process
 
 ## Security Layers
 
@@ -91,6 +96,62 @@
 - Customer ID (from user account)
 - Ticket Number (auto-generated)
 - Status (auto-set to 'booked')
+
+## Customer Repair Payment
+
+### Payment Process:
+- Customers can pay for repairs once a final cost is set by staff
+- Payment methods available: Mobile Money, Card, Pay on Collection
+- Payment status tracks: pending, paid, refunded
+- Payment confirmation email sent after successful payment
+- Payment button appears on customer dashboard when cost is set and payment is pending
+
+### Payment Status:
+- **Pending** - Repair cost set but not yet paid
+- **Paid** - Payment completed successfully
+- **Refunded** - Payment refunded (if applicable)
+
+## Technician Solution System
+
+### Purpose:
+Provide technicians with solution suggestions based on past repairs and enable online solution searches for efficient problem-solving.
+
+### Features:
+1. **Solution Documentation**
+   - Technicians can document solutions for completed repairs
+   - Store problem keywords, solution description, steps taken, parts used
+   - Track time required and difficulty level
+   - Add tags for categorization
+
+2. **Similar Past Repairs**
+   - System automatically finds similar past repairs based on:
+     - Device type
+     - Device brand
+     - Problem keywords
+   - Displays solutions from previous successful repairs
+   - Shows technician who solved it and difficulty level
+
+3. **Online Solution Search**
+   - Quick search on Google for repair solutions
+   - YouTube tutorial search integration
+   - Auto-generated search queries based on device and problem
+
+### Access:
+- **Staff/Admin Only** - `repair_solutions.php` is restricted to staff and admin users
+- **Customers Cannot Access** - Blocked in access control configuration
+
+### Database Table:
+`repair_solutions` table stores:
+- Repair ID reference
+- Technician ID reference
+- Problem keywords
+- Solution description
+- Steps taken
+- Parts used
+- Time required
+- Difficulty level (easy, medium, hard, expert)
+- Tags
+- Verification status
 
 ## Implementation Details
 
