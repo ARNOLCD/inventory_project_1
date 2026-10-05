@@ -74,20 +74,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['clear_sales'])) {
 }
 
 // Get statistics
-$total_products = $conn->query("SELECT COUNT(*) as count FROM products WHERE status = 'active'")->fetch_assoc()['count'];
-$total_services = $conn->query("SELECT COUNT(*) as count FROM services WHERE status = 'active'")->fetch_assoc()['count'];
-$low_stock = $conn->query("SELECT COUNT(*) as count FROM products WHERE quantity <= min_stock_level AND status = 'active'")->fetch_assoc()['count'];
+$counts = $conn->query("SELECT
+    (SELECT COUNT(*) FROM products WHERE status = 'active') AS total_products,
+    (SELECT COUNT(*) FROM services WHERE status = 'active') AS total_services,
+    (SELECT COUNT(*) FROM products WHERE quantity <= min_stock_level AND status = 'active') AS low_stock")->fetch_assoc();
+$total_products = $counts['total_products'];
+$total_services = $counts['total_services'];
+$low_stock = $counts['low_stock'];
 
-// Sales statistics
-$today_sales = $conn->query("SELECT COALESCE(SUM(total_amount), 0) as total FROM sales WHERE DATE(sale_date) = CURDATE()")->fetch_assoc()['total'];
-$week_sales = $conn->query("SELECT COALESCE(SUM(total_amount), 0) as total FROM sales WHERE sale_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)")->fetch_assoc()['total'];
-$month_sales = $conn->query("SELECT COALESCE(SUM(total_amount), 0) as total FROM sales WHERE MONTH(sale_date) = MONTH(CURDATE()) AND YEAR(sale_date) = YEAR(CURDATE())")->fetch_assoc()['total'];
-$year_sales = $conn->query("SELECT COALESCE(SUM(total_amount), 0) as total FROM sales WHERE YEAR(sale_date) = YEAR(CURDATE())")->fetch_assoc()['total'];
+// Sales statistics (paid sales only, one indexed scan)
+$period_start = "LEAST(DATE_SUB(CURDATE(), INTERVAL 7 DAY), MAKEDATE(YEAR(CURDATE()), 1))";
+$sales_stats = $conn->query("SELECT
+    COALESCE(SUM(CASE WHEN sale_date >= CURDATE() THEN total_amount END), 0) AS today,
+    COALESCE(SUM(CASE WHEN sale_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) THEN total_amount END), 0) AS week,
+    COALESCE(SUM(CASE WHEN sale_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01') THEN total_amount END), 0) AS month,
+    COALESCE(SUM(CASE WHEN YEAR(sale_date) = YEAR(CURDATE()) THEN total_amount END), 0) AS year
+    FROM sales WHERE payment_status = 'paid' AND sale_date >= $period_start")->fetch_assoc();
+$today_sales = $sales_stats['today'];
+$week_sales = $sales_stats['week'];
+$month_sales = $sales_stats['month'];
+$year_sales = $sales_stats['year'];
 
 // Items sold statistics
-$today_items = $conn->query("SELECT COALESCE(SUM(si.quantity), 0) as count FROM sale_items si JOIN sales s ON si.sale_id = s.id WHERE DATE(s.sale_date) = CURDATE()")->fetch_assoc()['count'];
-$week_items = $conn->query("SELECT COALESCE(SUM(si.quantity), 0) as count FROM sale_items si JOIN sales s ON si.sale_id = s.id WHERE s.sale_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)")->fetch_assoc()['count'];
-$month_items = $conn->query("SELECT COALESCE(SUM(si.quantity), 0) as count FROM sale_items si JOIN sales s ON si.sale_id = s.id WHERE MONTH(s.sale_date) = MONTH(CURDATE()) AND YEAR(s.sale_date) = YEAR(CURDATE())")->fetch_assoc()['count'];
+$item_stats = $conn->query("SELECT
+    COALESCE(SUM(CASE WHEN s.sale_date >= CURDATE() THEN si.quantity END), 0) AS today,
+    COALESCE(SUM(CASE WHEN s.sale_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) THEN si.quantity END), 0) AS week,
+    COALESCE(SUM(CASE WHEN s.sale_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01') THEN si.quantity END), 0) AS month
+    FROM sale_items si JOIN sales s ON si.sale_id = s.id
+    WHERE s.payment_status = 'paid' AND s.sale_date >= LEAST(DATE_SUB(CURDATE(), INTERVAL 7 DAY), DATE_FORMAT(CURDATE(), '%Y-%m-01'))")->fetch_assoc();
+$today_items = $item_stats['today'];
+$week_items = $item_stats['week'];
+$month_items = $item_stats['month'];
+
+// Repairs by category
+$repair_counts = repairStatusCounts($conn);
 
 // Get low stock products
 $low_stock_products = getLowStockProducts($conn);
@@ -136,7 +156,7 @@ $top_products = $conn->query("
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Sims-Tech Zambia</title>
+    <title>Dashboard - <?php echo e(companyName()); ?></title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -181,6 +201,25 @@ $top_products = $conn->query("
                     </div>
                 </div>
                 <?php endif; ?>
+
+                <!-- Repairs by category -->
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <h3><i class="fas fa-tools"></i> Repairs by Category</h3>
+                        <a href="repairs.php" class="btn btn-secondary btn-sm">Repair Tracking</a>
+                    </div>
+                    <div class="card-body" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(115px, 1fr)); gap: 10px;">
+                        <?php foreach (REPAIR_STATUSES as $status_key => $status_label): ?>
+                            <?php [$status_icon, $status_color] = REPAIR_STATUS_STYLES[$status_key]; ?>
+                            <a href="<?php echo $status_key === 'pending_approval' ? 'repair_requests.php' : 'repairs.php?status=' . $status_key; ?>"
+                               style="text-decoration: none; color: #2d3748; text-align: center; padding: 12px 6px; border-radius: 8px; background: #f7fafc; border-top: 4px solid <?php echo $status_color; ?>;">
+                                <i class="fas <?php echo $status_icon; ?>" style="color: <?php echo $status_color; ?>;"></i>
+                                <strong style="display: block; font-size: 1.4rem;"><?php echo $repair_counts[$status_key]; ?></strong>
+                                <span style="font-size: 0.78rem;"><?php echo e($status_label); ?></span>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
                 
                 <!-- Stats Grid -->
                 <div class="stats-grid">

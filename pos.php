@@ -1,6 +1,8 @@
 <?php
 require_once 'config/database.php';
 require_once 'config/session.php';
+require_once 'config/receipts.php';
+require_once 'config/alerts.php';
 requireStaff();
 
 $user = getCurrentUser();
@@ -12,54 +14,88 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_sale'])) {
     $customer_name = trim($_POST['customer_name'] ?? '');
     $customer_phone = trim($_POST['customer_phone'] ?? '');
-    $payment_method = $_POST['payment_method'];
-    $cart_items = json_decode($_POST['cart_items'], true);
-    $total_amount = floatval($_POST['total_amount']);
+    $customer_email = trim($_POST['customer_email'] ?? '');
+    $payment_method = $_POST['payment_method'] ?? '';
+    $cart_items = json_decode($_POST['cart_items'] ?? '[]', true);
     
-    if (empty($cart_items)) {
+    if (empty($cart_items) || !is_array($cart_items)) {
         $error = 'Cart is empty!';
+    } elseif (!isset(PAYMENT_METHODS[$payment_method])) {
+        $error = 'Please choose a valid payment method.';
+    } elseif ($customer_email !== '' && !filter_var($customer_email, FILTER_VALIDATE_EMAIL)) {
+        $error = 'Please enter a valid customer email address (or leave it blank).';
     } else {
         // Generate invoice number
         $invoice_number = generateInvoiceNumber($conn);
+        $sold_product_ids = [];
         
         // Start transaction
         $conn->begin_transaction();
         
         try {
+            // Prices always come from the database, never from the browser
+            $lines = [];
+            $total_amount = 0;
+            foreach ($cart_items as $item) {
+                $item_type = ($item['type'] ?? '') === 'service' ? 'service' : 'product';
+                $item_id = intval($item['id'] ?? 0);
+                $quantity = intval($item['quantity'] ?? 0);
+                if ($item_id <= 0 || $quantity <= 0) {
+                    throw new Exception('Invalid item in cart.');
+                }
+                $table = $item_type === 'product' ? 'products' : 'services';
+                $row = $conn->query("SELECT id, name, price FROM $table WHERE id = $item_id AND status = 'active'")->fetch_assoc();
+                if (!$row) {
+                    throw new Exception('An item in the cart is no longer available.');
+                }
+                $lines[] = [$item_type, $item_id, $quantity, (float)$row['price'], $row['name']];
+                $total_amount += (float)$row['price'] * $quantity;
+            }
+
             // Insert sale
-            $stmt = $conn->prepare("INSERT INTO sales (invoice_number, user_id, customer_name, customer_phone, total_amount, payment_method) VALUES (?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("sissds", $invoice_number, $user['id'], $customer_name, $customer_phone, $total_amount, $payment_method);
+            $stmt = $conn->prepare("INSERT INTO sales (invoice_number, user_id, customer_name, customer_phone, customer_email, total_amount, payment_method, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?, 'paid')");
+            $stmt->bind_param("sisssds", $invoice_number, $user['id'], $customer_name, $customer_phone, $customer_email, $total_amount, $payment_method);
             $stmt->execute();
             $sale_id = $conn->insert_id;
             
             // Insert sale items and update stock
-            foreach ($cart_items as $item) {
-                $item_type = $item['type'];
-                $product_id = $item_type === 'product' ? $item['id'] : null;
-                $service_id = $item_type === 'service' ? $item['id'] : null;
-                $quantity = intval($item['quantity']);
-                $unit_price = floatval($item['price']);
+            $item_stmt = $conn->prepare("INSERT INTO sale_items (sale_id, product_id, service_id, item_type, quantity, unit_price, total_price) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $stock_stmt = $conn->prepare("UPDATE products SET quantity = quantity - ? WHERE id = ? AND quantity >= ?");
+            foreach ($lines as [$item_type, $item_id, $quantity, $unit_price, $name]) {
+                $product_id = $item_type === 'product' ? $item_id : null;
+                $service_id = $item_type === 'service' ? $item_id : null;
                 $item_total = $unit_price * $quantity;
+                $item_stmt->bind_param("iiisidd", $sale_id, $product_id, $service_id, $item_type, $quantity, $unit_price, $item_total);
+                $item_stmt->execute();
                 
-                $stmt = $conn->prepare("INSERT INTO sale_items (sale_id, product_id, service_id, item_type, quantity, unit_price, total_price) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                $stmt->bind_param("iiisidd", $sale_id, $product_id, $service_id, $item_type, $quantity, $unit_price, $item_total);
-                $stmt->execute();
-                
-                // Update product stock
+                // Update product stock (never below zero)
                 if ($item_type === 'product') {
-                    $conn->query("UPDATE products SET quantity = quantity - $quantity WHERE id = $product_id");
+                    $stock_stmt->bind_param("iii", $quantity, $product_id, $quantity);
+                    $stock_stmt->execute();
+                    if ($stock_stmt->affected_rows !== 1) {
+                        throw new Exception("Not enough stock for $name.");
+                    }
+                    $sold_product_ids[] = $product_id;
                 }
             }
             
             $conn->commit();
-            $message = "✅ Sale completed successfully! Invoice: $invoice_number | Total: K" . number_format($total_amount, 2);
-            
-            // Clear cart via JavaScript
-            echo "<script>localStorage.removeItem('pos_cart');</script>";
-            
+            $sale_completed = true;
         } catch (Exception $e) {
             $conn->rollback();
-            $error = '❌ Error processing sale: ' . $e->getMessage();
+            $error = 'Error processing sale: ' . e($e->getMessage());
+        }
+
+        if (!empty($sale_completed)) {
+            // Automatic receipt (emailed if the customer gave an email) + low-stock alerts
+            $receipt_id = issueReceipt($conn, 'sale', $sale_id);
+            checkLowStock($conn, $sold_product_ids);
+            $message = "Sale completed! Invoice: $invoice_number | Total: K" . number_format($total_amount, 2)
+                     . ' | <a href="receipt.php?id=' . (int)$receipt_id . '&print=1" target="_blank"><strong><i class="fas fa-print"></i> Print receipt</strong></a>'
+                     . ($customer_email !== '' ? ' (also emailed to ' . e($customer_email) . ')' : '');
+            
+            // Clear cart via JavaScript
+            $clear_cart = true;
         }
     }
 }
@@ -78,7 +114,7 @@ $categories = $conn->query("SELECT * FROM categories ORDER BY name ASC");
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Point of Sale - Sims-Tech Zambia</title>
+    <title>Point of Sale - <?php echo e(companyName()); ?></title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -340,6 +376,7 @@ $categories = $conn->query("SELECT * FROM categories ORDER BY name ASC");
                 
                 <?php if ($message): ?>
                     <div class="alert alert-success"><i class="fas fa-check-circle"></i> <?php echo $message; ?></div>
+                    <?php if (!empty($clear_cart)): ?><script>localStorage.removeItem('pos_cart');</script><?php endif; ?>
                 <?php endif; ?>
                 <?php if ($error): ?>
                     <div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <?php echo $error; ?></div>
@@ -440,6 +477,9 @@ $categories = $conn->query("SELECT * FROM categories ORDER BY name ASC");
                                 </div>
                                 <div class="form-group">
                                     <input type="text" name="customer_phone" class="form-control" placeholder="Phone (optional)">
+                                </div>
+                                <div class="form-group">
+                                    <input type="email" name="customer_email" class="form-control" placeholder="Email - receipt is sent here (optional)">
                                 </div>
                                 <div class="form-group">
                                     <select name="payment_method" class="form-control" required>

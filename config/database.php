@@ -14,26 +14,59 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-// Ensure users.role accepts all roles (otherwise MySQL silently stores an empty role)
-function ensureUserRoles($conn) {
-    $role_column = $conn->query("SHOW COLUMNS FROM users LIKE 'role'")->fetch_assoc();
-    foreach (['customer', 'technician', 'sales'] as $role) {
-        if ($role_column && strpos($role_column['Type'], "'$role'") === false) {
-            $conn->query("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'employee', 'technician', 'sales', 'customer') DEFAULT 'employee'");
-            return;
-        }
-    }
+// Buffer page output so queued emails can be sent after the page has been delivered
+if (PHP_SAPI !== 'cli' && ob_get_level() <= 1) {
+    ob_start();
 }
 
-// Ensure repairs table supports customer repair requests (pending approval / rejected)
-function ensureRepairRequestSchema($conn) {
-    $status_column = $conn->query("SHOW COLUMNS FROM repairs LIKE 'status'")->fetch_assoc();
-    if ($status_column && strpos($status_column['Type'], "'pending_approval'") === false) {
-        $conn->query("ALTER TABLE repairs MODIFY COLUMN status ENUM('pending_approval', 'booked', 'item_received', 'in_progress', 'completed', 'in_transit', 'delivered', 'cancelled', 'rejected') DEFAULT 'booked'");
+require_once __DIR__ . '/settings.php';
+require_once __DIR__ . '/migrations.php';
+runMigrations($conn);
+
+// Repair status categories in workflow order, with display labels
+const REPAIR_STATUSES = [
+    'pending_approval' => 'Pending Approval',
+    'booked' => 'Booked',
+    'item_received' => 'Item Received',
+    'in_progress' => 'In Progress',
+    'completed' => 'Completed',
+    'in_transit' => 'In Transit',
+    'delivered' => 'Delivered',
+    'rejected' => 'Declined',
+    'cancelled' => 'Cancelled',
+];
+
+// Icon and colour per repair category
+const REPAIR_STATUS_STYLES = [
+    'pending_approval' => ['fa-hourglass-half', '#718096'],
+    'booked' => ['fa-clipboard-list', '#3182ce'],
+    'item_received' => ['fa-box', '#4299e1'],
+    'in_progress' => ['fa-wrench', '#dd6b20'],
+    'completed' => ['fa-check-circle', '#38a169'],
+    'in_transit' => ['fa-shipping-fast', '#9f7aea'],
+    'delivered' => ['fa-hand-holding', '#805ad5'],
+    'rejected' => ['fa-ban', '#c53030'],
+    'cancelled' => ['fa-times-circle', '#e53e3e'],
+];
+
+// Number of repairs in each category (single query)
+function repairStatusCounts($conn) {
+    $counts = array_fill_keys(array_keys(REPAIR_STATUSES), 0);
+    $result = $conn->query("SELECT status, COUNT(*) AS c FROM repairs GROUP BY status");
+    while ($row = $result->fetch_assoc()) {
+        $counts[$row['status']] = (int)$row['c'];
     }
-    $conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS rejection_reason TEXT DEFAULT NULL");
-    $conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS reviewed_by INT DEFAULT NULL");
-    $conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS reviewed_date DATETIME DEFAULT NULL");
+    return $counts;
+}
+
+function repairStatusLabel($status) {
+    return REPAIR_STATUSES[$status] ?? ucfirst(str_replace('_', ' ', (string)$status));
+}
+
+// Generate repair ticket number
+function generateTicketNumber($conn) {
+    $row = $conn->query("SELECT MAX(id) as max_id FROM repairs")->fetch_assoc();
+    return 'REP' . date('Ymd') . str_pad(($row['max_id'] ?? 0) + 1, 4, '0', \STR_PAD_LEFT);
 }
 
 // Function to get low stock products

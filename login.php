@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($username) || empty($password)) {
         $error = 'Please enter both username and password.';
     } else {
-        $stmt = $conn->prepare("SELECT id, username, password, full_name, role FROM users WHERE LOWER(username) = LOWER(?)");
+        $stmt = $conn->prepare("SELECT id, username, password, full_name, role, must_change_password FROM users WHERE LOWER(username) = LOWER(?)");
         $stmt->bind_param("s", $username);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -29,14 +29,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($result->num_rows === 1) {
             $user = $result->fetch_assoc();
             if (password_verify($password, $user['password'])) {
+                session_regenerate_id(true);
                 setUserSession($user);
                 
-                // Redirect based on role
-                if ($user['role'] === 'customer') {
-                    header('Location: customer_dashboard.php');
-                } else {
-                    header('Location: dashboard.php');
-                }
+                // Redirect based on role (or to choose a password first)
+                header('Location: ' . (!empty($user['must_change_password']) ? 'change_password.php' : homePage()));
                 exit();
             } else {
                 $error = 'Invalid username or password.';
@@ -53,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Sims-Tech Zambia</title>
+    <title>Login - <?php echo e(companyName()); ?></title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -303,7 +300,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="auth-container">
         <div class="auth-card">
             <div class="auth-header">
-                <img src="assets/images/sims-tech-logo.jpg" alt="Sims-Tech Zambia Logo" onerror="this.style.display='none'">
+                <img src="<?php echo e(companyLogo()); ?>" alt="<?php echo e(companyName()); ?> Logo" onerror="this.style.display='none'">
                 <h1>Welcome Back</h1>
                 <p>Sign in to your account to shop products and book repairs</p>
             </div>
@@ -338,7 +335,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <a href="index.php"><i class="fas fa-arrow-left"></i> Back to Website</a>
                 
                 <div style="margin-top: 25px; padding-top: 25px; border-top: 1px solid #e2e8f0;">
-                    <p style="color: #718096; margin-bottom: 15px;">New to Sims-Tech Zambia?</p>
+                    <p style="color: #718096; margin-bottom: 15px;">New to <?php echo e(companyName()); ?>?</p>
                     <a href="signup.php" class="create-account">
                         <i class="fas fa-user-plus"></i> Create Your Account
                     </a>

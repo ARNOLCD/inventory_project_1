@@ -14,32 +14,45 @@ if (!isCustomer()) {
 // Get customer's repairs
 $repairs = $conn->query("
     SELECT r.*, 
-           u1.full_name as technician_name
+           u1.full_name as technician_name,
+           d.id as receipt_id
     FROM repairs r 
     LEFT JOIN users u1 ON r.technician_id = u1.id 
+    LEFT JOIN documents d ON d.source_type = 'repair' AND d.source_id = r.id 
     WHERE r.customer_id = {$user['id']}
     ORDER BY r.created_at DESC
 ");
 
 // Get counts
-$pending_approval_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE customer_id = {$user['id']} AND status = 'pending_approval'")->fetch_assoc()['c'];
-$booked_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE customer_id = {$user['id']} AND status = 'booked'")->fetch_assoc()['c'];
-$item_received_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE customer_id = {$user['id']} AND status = 'item_received'")->fetch_assoc()['c'];
-$in_progress_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE customer_id = {$user['id']} AND status = 'in_progress'")->fetch_assoc()['c'];
-$completed_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE customer_id = {$user['id']} AND status = 'completed'")->fetch_assoc()['c'];
-$in_transit_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE customer_id = {$user['id']} AND status = 'in_transit'")->fetch_assoc()['c'];
-$delivered_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE customer_id = {$user['id']} AND status = 'delivered'")->fetch_assoc()['c'];
+$my_counts = array_fill_keys(array_keys(REPAIR_STATUSES), 0);
+$count_result = $conn->query("SELECT status, COUNT(*) AS c FROM repairs WHERE customer_id = " . (int)$user['id'] . " GROUP BY status");
+while ($row = $count_result->fetch_assoc()) {
+    $my_counts[$row['status']] = (int)$row['c'];
+}
+$pending_approval_count = $my_counts['pending_approval'];
+$booked_count = $my_counts['booked'];
+$item_received_count = $my_counts['item_received'];
+$in_progress_count = $my_counts['in_progress'];
+$completed_count = $my_counts['completed'];
+$in_transit_count = $my_counts['in_transit'];
+$delivered_count = $my_counts['delivered'];
 
 // Get customer's purchase orders
 $orders = $conn->query("
     SELECT s.*, 
-           COUNT(si.id) as item_count
+           COUNT(si.id) as item_count,
+           MAX(d.id) as receipt_id
     FROM sales s 
     LEFT JOIN sale_items si ON s.id = si.sale_id
+    LEFT JOIN documents d ON d.source_type = 'sale' AND d.source_id = s.id
     WHERE s.user_id = {$user['id']}
     GROUP BY s.id
     ORDER BY s.sale_date DESC
 ");
+
+// Customer's payment receipts (generated automatically for every payment)
+$receipts = $conn->query("SELECT id, document_number, total_amount, payment_method, notes, created_at FROM documents
+                          WHERE document_type = 'receipt' AND customer_id = " . (int)$user['id'] . " ORDER BY created_at DESC");
 
 // Get shopping cart count from localStorage (simulated)
 $cart_count = 0; // This would be dynamic in a real implementation
@@ -49,7 +62,7 @@ $cart_count = 0; // This would be dynamic in a real implementation
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Customer Dashboard - Sims-Tech Zambia</title>
+    <title>Customer Dashboard - <?php echo e(companyName()); ?></title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -223,7 +236,7 @@ $cart_count = 0; // This would be dynamic in a real implementation
     <div class="customer-container">
         <div class="customer-header">
             <div class="customer-info">
-                <img src="assets/images/sims-tech-logo.jpg" alt="Sims-Tech Zambia Logo" onerror="this.style.display='none'" style="max-height: 40px; margin-bottom: 10px;">
+                <img src="<?php echo e(companyLogo()); ?>" alt="<?php echo e(companyName()); ?> Logo" onerror="this.style.display='none'" style="max-height: 40px; margin-bottom: 10px;">
                 <h1>Welcome, <?php echo htmlspecialchars($user['full_name']); ?></h1>
                 <p><?php echo htmlspecialchars($user['email'] ?? ''); ?> | <?php echo htmlspecialchars($user['phone'] ?? ''); ?></p>
             </div>
@@ -404,6 +417,12 @@ $cart_count = 0; // This would be dynamic in a real implementation
                                         <i class="fas fa-credit-card"></i> Pay Now
                                     </a>
                                 </div>
+                            <?php elseif ($repair['receipt_id']): ?>
+                                <div style="margin-top: 15px;">
+                                    <a href="receipt.php?id=<?php echo (int)$repair['receipt_id']; ?>" class="btn btn-secondary btn-sm">
+                                        <i class="fas fa-receipt"></i> View Receipt
+                                    </a>
+                                </div>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -439,15 +458,20 @@ $cart_count = 0; // This would be dynamic in a real implementation
                                     Order #<?php echo $order['id']; ?>
                                 </div>
                             </div>
-                            <span class="status-badge status-completed">
-                                <?php echo ucfirst(str_replace('_', ' ', $order['payment_method'])); ?>
-                            </span>
+                            <?php if (($order['payment_status'] ?? 'paid') === 'pending'): ?>
+                                <span class="status-badge status-booked">Pay on collection</span>
+                            <?php else: ?>
+                                <span class="status-badge status-completed">Paid - <?php echo e(ucfirst(str_replace('_', ' ', $order['payment_method']))); ?></span>
+                            <?php endif; ?>
                         </div>
                         
                         <div class="repair-details">
                             <p><strong>Items:</strong> <?php echo $order['item_count']; ?> items</p>
                             <p><strong>Total:</strong> K<?php echo number_format($order['total_amount'], 2); ?></p>
                             <p><strong>Date:</strong> <?php echo date('M d, Y H:i', strtotime($order['sale_date'])); ?></p>
+                            <?php if ($order['receipt_id']): ?>
+                                <a href="receipt.php?id=<?php echo (int)$order['receipt_id']; ?>" class="btn btn-secondary btn-sm"><i class="fas fa-receipt"></i> Receipt</a>
+                            <?php endif; ?>
                         </div>
                     </div>
                 <?php endwhile; ?>
@@ -458,6 +482,41 @@ $cart_count = 0; // This would be dynamic in a real implementation
                     <a href="products.php" class="btn btn-primary" style="margin-top: 15px;">
                         <i class="fas fa-shopping-cart"></i> Start Shopping
                     </a>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- Receipts Section -->
+        <div class="repairs-section" style="margin-top: 30px;">
+            <div class="section-header">
+                <h2><i class="fas fa-receipt"></i> My Receipts</h2>
+                <span style="color: #718096; font-size: 0.9rem;">Total: <?php echo $receipts->num_rows; ?></span>
+            </div>
+            <?php if ($receipts->num_rows > 0): ?>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead><tr><th>Receipt No</th><th>For</th><th>Amount</th><th>Method</th><th>Date</th><th></th></tr></thead>
+                        <tbody>
+                            <?php while ($receipt = $receipts->fetch_assoc()): ?>
+                                <tr>
+                                    <td><strong><?php echo e($receipt['document_number']); ?></strong></td>
+                                    <td><?php echo e($receipt['notes']); ?></td>
+                                    <td>K<?php echo number_format($receipt['total_amount'], 2); ?></td>
+                                    <td><?php echo e(ucfirst(str_replace('_', ' ', $receipt['payment_method']))); ?></td>
+                                    <td><?php echo date('M d, Y H:i', strtotime($receipt['created_at'])); ?></td>
+                                    <td>
+                                        <a href="receipt.php?id=<?php echo (int)$receipt['id']; ?>" class="btn btn-secondary btn-sm"><i class="fas fa-eye"></i> View</a>
+                                        <a href="receipt.php?id=<?php echo (int)$receipt['id']; ?>&amp;print=1" class="btn btn-primary btn-sm"><i class="fas fa-print"></i> Print</a>
+                                    </td>
+                                </tr>
+                            <?php endwhile; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php else: ?>
+                <div class="no-repairs">
+                    <i class="fas fa-receipt"></i>
+                    <p>No receipts yet. A receipt is created and emailed to you automatically every time you pay.</p>
                 </div>
             <?php endif; ?>
         </div>

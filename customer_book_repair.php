@@ -15,71 +15,10 @@ if (!isCustomer()) {
 $message = '';
 $error = '';
 
-// Create repairs table if not exists (for consistency)
-$conn->query("
-    CREATE TABLE IF NOT EXISTS repairs (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        ticket_number VARCHAR(50) UNIQUE NOT NULL,
-        customer_name VARCHAR(100) NOT NULL,
-        customer_phone VARCHAR(20),
-        customer_email VARCHAR(100),
-        customer_id INT,
-        device_type VARCHAR(50) NOT NULL,
-        device_brand VARCHAR(50),
-        device_model VARCHAR(100),
-        serial_number VARCHAR(100),
-        problem_description TEXT NOT NULL,
-        diagnosis TEXT,
-        repair_notes TEXT,
-        estimated_cost DECIMAL(10, 2),
-        final_cost DECIMAL(10, 2),
-        status ENUM('pending_approval', 'booked', 'item_received', 'in_progress', 'completed', 'in_transit', 'delivered', 'cancelled', 'rejected') DEFAULT 'booked',
-        priority ENUM('low', 'normal', 'high', 'urgent') DEFAULT 'normal',
-        received_by INT,
-        technician_id INT,
-        received_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        item_received_date DATETIME,
-        started_date DATETIME,
-        completed_date DATETIME,
-        in_transit_date DATETIME,
-        delivered_date DATETIME,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE SET NULL,
-        FOREIGN KEY (received_by) REFERENCES users(id) ON DELETE SET NULL,
-        FOREIGN KEY (technician_id) REFERENCES users(id) ON DELETE SET NULL
-    )
-");
-
-// Add columns if not exists
-$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS item_photo VARCHAR(255) DEFAULT NULL AFTER serial_number");
-$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS customer_id INT DEFAULT NULL AFTER customer_email");
-
-// Add new tracking columns for item delivery status
-$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS item_received_date DATETIME DEFAULT NULL AFTER received_date");
-$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS in_transit_date DATETIME DEFAULT NULL AFTER completed_date");
-
-// Update status ENUM to include new statuses (incl. pending_approval / rejected for customer requests)
-ensureRepairRequestSchema($conn);
-
-$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50) DEFAULT NULL AFTER final_cost");
-$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS payment_status ENUM('pending', 'paid', 'refunded') DEFAULT 'pending' AFTER payment_method");
-$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS payment_date DATETIME DEFAULT NULL AFTER payment_status");
-
 // Create uploads directory for repair photos
 $repair_upload_dir = 'uploads/repairs/';
 if (!is_dir($repair_upload_dir)) {
     mkdir($repair_upload_dir, 0777, true);
-}
-
-// Generate ticket number
-function generateTicketNumber($conn) {
-    $prefix = 'REP';
-    $date = date('Ymd');
-    $result = $conn->query("SELECT MAX(id) as max_id FROM repairs");
-    $row = $result->fetch_assoc();
-    $next_id = ($row['max_id'] ?? 0) + 1;
-    return $prefix . $date . str_pad($next_id, 4, '0', STR_PAD_LEFT);
 }
 
 // Handle form submission
@@ -140,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <body>
                 <div class='container'>
                     <div class='header'>
-                        <h1>Sims-Tech Zambia</h1>
+                        <h1>" . e(companyName()) . "</h1>
                         <p>Repair Request Received</p>
                     </div>
                     <div class='content'>
@@ -173,8 +112,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </p>
                     </div>
                     <div class='footer'>
-                        <p>&copy; " . date('Y') . " Sims-Tech Zambia. All rights reserved.</p>
-                        <p>For questions, contact us at info@actechnology.co.zm</p>
+                        <p>&copy; " . date('Y') . " " . e(companyName()) . ". All rights reserved.</p>
+                        " . (companyContactEmail() ? "<p>For questions, contact us at " . e(companyContactEmail()) . "</p>" : '') . "
                     </div>
                 </div>
             </body>
@@ -192,7 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Book Repair - Sims-Tech Zambia</title>
+    <title>Book Repair - <?php echo e(companyName()); ?></title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -240,7 +179,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
     <div class="customer-container">
         <div class="customer-header">
-            <img src="assets/images/sims-tech-logo.jpg" alt="Sims-Tech Zambia Logo" onerror="this.style.display='none'" style="max-height: 60px; margin-bottom: 15px;">
+            <img src="<?php echo e(companyLogo()); ?>" alt="<?php echo e(companyName()); ?> Logo" onerror="this.style.display='none'" style="max-height: 60px; margin-bottom: 15px;">
             <h1><i class="fas fa-tools"></i> Book a Repair</h1>
             <p>Submit your device for repair service</p>
         </div>

@@ -2,119 +2,17 @@
 require_once 'config/database.php';
 require_once 'config/session.php';
 require_once 'config/email.php';
+require_once 'config/receipts.php';
 requireStaff();
 
 $user = getCurrentUser();
 $message = '';
 $error = '';
 
-// Create repairs table if not exists
-$conn->query("
-    CREATE TABLE IF NOT EXISTS repairs (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        ticket_number VARCHAR(50) UNIQUE NOT NULL,
-        customer_name VARCHAR(100) NOT NULL,
-        customer_phone VARCHAR(20),
-        customer_email VARCHAR(100),
-        device_type VARCHAR(50) NOT NULL,
-        device_brand VARCHAR(50),
-        device_model VARCHAR(100),
-        serial_number VARCHAR(100),
-        problem_description TEXT NOT NULL,
-        diagnosis TEXT,
-        repair_notes TEXT,
-        estimated_cost DECIMAL(10, 2),
-        final_cost DECIMAL(10, 2),
-        status ENUM('pending_approval', 'booked', 'item_received', 'in_progress', 'completed', 'in_transit', 'delivered', 'cancelled', 'rejected') DEFAULT 'booked',
-        priority ENUM('low', 'normal', 'high', 'urgent') DEFAULT 'normal',
-        received_by INT,
-        technician_id INT,
-        received_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        item_received_date DATETIME,
-        started_date DATETIME,
-        completed_date DATETIME,
-        in_transit_date DATETIME,
-        delivered_date DATETIME,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (received_by) REFERENCES users(id) ON DELETE SET NULL,
-        FOREIGN KEY (technician_id) REFERENCES users(id) ON DELETE SET NULL
-    )
-");
-
-// Add item_photo column if not exists
-$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS item_photo VARCHAR(255) DEFAULT NULL AFTER serial_number");
-
-// Add customer_id column if not exists
-$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS customer_id INT DEFAULT NULL AFTER customer_email");
-
-// Add new tracking columns for item delivery status
-$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS item_received_date DATETIME DEFAULT NULL AFTER received_date");
-$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS in_transit_date DATETIME DEFAULT NULL AFTER completed_date");
-
-// Update status ENUM to include new statuses (incl. pending_approval / rejected for customer requests)
-ensureRepairRequestSchema($conn);
-
-// Add foreign key constraint for customer_id if not exists (safe approach)
-try {
-    $conn->query("ALTER TABLE repairs ADD CONSTRAINT fk_repairs_customer FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE SET NULL");
-} catch (Exception $e) {
-    // Foreign key might already exist, ignore error
-}
-
-// Create repair_solutions table for storing technician solutions
-// First create table without foreign keys
-$conn->query("
-    CREATE TABLE IF NOT EXISTS repair_solutions (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        repair_id INT NOT NULL,
-        technician_id INT NOT NULL,
-        problem_keywords TEXT,
-        solution_description TEXT NOT NULL,
-        steps_taken TEXT,
-        parts_used TEXT,
-        time_required VARCHAR(100),
-        difficulty_level ENUM('easy', 'medium', 'hard', 'expert') DEFAULT 'medium',
-        success_rate INT DEFAULT 100,
-        tags VARCHAR(255),
-        is_verified BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )
-");
-
-// Add foreign keys separately (safe approach)
-try {
-    $conn->query("ALTER TABLE repair_solutions ADD CONSTRAINT fk_repair_solutions_repair FOREIGN KEY (repair_id) REFERENCES repairs(id) ON DELETE CASCADE");
-} catch (Exception $e) {
-    // Foreign key might already exist, ignore error
-}
-
-try {
-    $conn->query("ALTER TABLE repair_solutions ADD CONSTRAINT fk_repair_solutions_technician FOREIGN KEY (technician_id) REFERENCES users(id) ON DELETE SET NULL");
-} catch (Exception $e) {
-    // Foreign key might already exist, ignore error
-}
-
-// Add payment columns to repairs table if not exists
-$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50) DEFAULT NULL AFTER final_cost");
-$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS payment_status ENUM('pending', 'paid', 'refunded') DEFAULT 'pending' AFTER payment_method");
-$conn->query("ALTER TABLE repairs ADD COLUMN IF NOT EXISTS payment_date DATETIME DEFAULT NULL AFTER payment_status");
-
 // Create uploads directory for repair photos
 $repair_upload_dir = 'uploads/repairs/';
 if (!is_dir($repair_upload_dir)) {
     mkdir($repair_upload_dir, 0777, true);
-}
-
-// Generate ticket number
-function generateTicketNumber($conn) {
-    $prefix = 'REP';
-    $date = date('Ymd');
-    $result = $conn->query("SELECT MAX(id) as max_id FROM repairs");
-    $row = $result->fetch_assoc();
-    $next_id = ($row['max_id'] ?? 0) + 1;
-    return $prefix . $date . str_pad($next_id, 4, '0', STR_PAD_LEFT);
 }
 
 // Handle form submissions
@@ -243,9 +141,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $error = 'Error updating repair.';
         }
+    } elseif ($action === 'record_payment') {
+        // Counter payment taken by staff: mark paid once, then issue + email the receipt
+        $id = intval($_POST['id']);
+        $payment_method = $_POST['payment_method'] ?? '';
+        if (!isset(PAYMENT_METHODS[$payment_method])) {
+            $error = 'Please choose a payment method.';
+        } else {
+            $stmt = $conn->prepare("UPDATE repairs SET payment_method = ?, payment_status = 'paid', payment_date = NOW() WHERE id = ? AND payment_status <> 'paid' AND final_cost > 0");
+            $stmt->bind_param("si", $payment_method, $id);
+            $stmt->execute();
+            if ($stmt->affected_rows === 1) {
+                $receipt_id = issueReceipt($conn, 'repair', $id);
+                $message = 'Payment recorded and receipt issued. <a href="receipt.php?id=' . (int)$receipt_id . '&print=1" target="_blank"><strong>Print receipt</strong></a>';
+            } else {
+                $error = 'Payment could not be recorded: the repair is already paid or has no final cost set.';
+            }
+        }
     } elseif ($action === 'delete') {
         $id = intval($_POST['id']);
-        if ($conn->query("DELETE FROM repairs WHERE id = $id")) {
+        if (!isAdmin()) {
+            $error = 'Only administrators can delete repair tickets.';
+        } elseif ($conn->query("DELETE FROM repairs WHERE id = $id")) {
             $message = 'Repair ticket deleted successfully!';
         } else {
             $error = 'Error deleting repair ticket.';
@@ -254,16 +171,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Get filter
-$status_filter = $_GET['status'] ?? '';
+$status_filter = isset(REPAIR_STATUSES[$_GET['status'] ?? '']) ? $_GET['status'] : '';
 $technician_filter = $_GET['technician'] ?? '';
 
 // Build query
 $where = "WHERE 1=1";
 if ($status_filter) {
-    $where .= " AND r.status = '" . $conn->real_escape_string($status_filter) . "'";
+    $where .= " AND r.status = '$status_filter'";
 } else {
-    // Pending customer requests are handled on repair_requests.php; declined ones only show via their filter
-    $where .= " AND r.status NOT IN ('pending_approval', 'rejected')";
+    // Pending customer requests are handled on repair_requests.php; declined/cancelled only show via their filter
+    $where .= " AND r.status NOT IN ('pending_approval', 'rejected', 'cancelled')";
 }
 if ($technician_filter) {
     $where .= " AND r.technician_id = " . intval($technician_filter);
@@ -293,12 +210,7 @@ $repairs = $conn->query("
 ");
 
 // Get counts
-$booked_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE status = 'booked'")->fetch_assoc()['c'];
-$item_received_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE status = 'item_received'")->fetch_assoc()['c'];
-$in_progress_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE status = 'in_progress'")->fetch_assoc()['c'];
-$completed_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE status = 'completed'")->fetch_assoc()['c'];
-$in_transit_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE status = 'in_transit'")->fetch_assoc()['c'];
-$delivered_count = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE status = 'delivered'")->fetch_assoc()['c'];
+$status_counts = repairStatusCounts($conn);
 
 // Get technicians for dropdown
 $technicians = $conn->query("SELECT id, full_name FROM users WHERE role IN ('" . implode("','", STAFF_ROLES) . "') ORDER BY full_name");
@@ -311,7 +223,7 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Repair Tracking - Sims-Tech Zambia</title>
+    <title>Repair Tracking - <?php echo e(companyName()); ?></title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -324,6 +236,14 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
         .status-in_transit { background: #9f7aea; color: white; }
         .status-delivered { background: #805ad5; color: white; }
         .status-cancelled { background: #e53e3e; color: white; }
+        .repair-categories { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+        .repair-category { background: #fff; border-radius: 10px; padding: 14px 10px; text-align: center; text-decoration: none; color: #2d3748; box-shadow: 0 2px 4px rgba(0,0,0,0.08); border-top: 4px solid var(--cat-color); transition: transform 0.15s; }
+        .repair-category:hover { transform: translateY(-2px); }
+        .repair-category.active { background: var(--cat-color); color: #fff; }
+        .repair-category i { color: var(--cat-color); font-size: 1.2rem; }
+        .repair-category.active i { color: #fff; }
+        .repair-category strong { display: block; font-size: 1.5rem; margin: 4px 0 0; }
+        .repair-category span { font-size: 0.8rem; }
         .status-pending_approval { background: #718096; color: white; }
         .status-rejected { background: #c53030; color: white; }
         .priority-urgent { border-left: 4px solid #e53e3e; }
@@ -408,89 +328,26 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
                     <div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <?php echo $error; ?></div>
                 <?php endif; ?>
                 
-                <!-- Stats -->
-                <div class="stats-grid mb-4">
-                    <div class="stat-card">
-                        <div class="stat-icon blue">
-                            <i class="fas fa-clipboard-list"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3><?php echo $booked_count; ?></h3>
-                            <p>Booked</p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background: #4299e1;">
-                            <i class="fas fa-box"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3><?php echo $item_received_count; ?></h3>
-                            <p>Item Received</p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon orange">
-                            <i class="fas fa-wrench"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3><?php echo $in_progress_count; ?></h3>
-                            <p>In Progress</p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon green">
-                            <i class="fas fa-check-circle"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3><?php echo $completed_count; ?></h3>
-                            <p>Completed</p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background: #9f7aea;">
-                            <i class="fas fa-shipping-fast"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3><?php echo $in_transit_count; ?></h3>
-                            <p>In Transit</p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon purple" style="background: #805ad5;">
-                            <i class="fas fa-hand-holding"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3><?php echo $delivered_count; ?></h3>
-                            <p>Delivered</p>
-                        </div>
-                    </div>
+                <!-- Repair categories (click to filter) -->
+                <div class="repair-categories mb-4">
+                    <?php foreach (REPAIR_STATUSES as $status_key => $status_label): ?>
+                        <?php [$status_icon, $status_color] = REPAIR_STATUS_STYLES[$status_key]; ?>
+                        <a href="<?php echo $status_key === 'pending_approval' ? 'repair_requests.php' : 'repairs.php?status=' . $status_key; ?>"
+                           class="repair-category <?php echo $status_filter === $status_key ? 'active' : ''; ?>" style="--cat-color: <?php echo $status_color; ?>;">
+                            <i class="fas <?php echo $status_icon; ?>"></i>
+                            <strong><?php echo (int)($status_counts[$status_key] ?? 0); ?></strong>
+                            <span><?php echo e($status_label); ?></span>
+                        </a>
+                    <?php endforeach; ?>
                 </div>
                 
                 <!-- Filters -->
                 <div class="card mb-4">
                     <div class="card-body" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
-                        <a href="repairs.php" class="btn <?php echo !$status_filter && !$technician_filter ? 'btn-primary' : 'btn-secondary'; ?> btn-sm">All</a>
-                        <a href="repairs.php?status=booked" class="btn <?php echo $status_filter === 'booked' ? 'btn-primary' : 'btn-secondary'; ?> btn-sm">
-                            <i class="fas fa-clipboard-list"></i> Booked
-                        </a>
-                        <a href="repairs.php?status=item_received" class="btn <?php echo $status_filter === 'item_received' ? 'btn-primary' : 'btn-secondary'; ?> btn-sm">
-                            <i class="fas fa-box"></i> Item Received
-                        </a>
-                        <a href="repairs.php?status=in_progress" class="btn <?php echo $status_filter === 'in_progress' ? 'btn-primary' : 'btn-secondary'; ?> btn-sm">
-                            <i class="fas fa-wrench"></i> In Progress
-                        </a>
-                        <a href="repairs.php?status=completed" class="btn <?php echo $status_filter === 'completed' ? 'btn-primary' : 'btn-secondary'; ?> btn-sm">
-                            <i class="fas fa-check-circle"></i> Completed
-                        </a>
-                        <a href="repairs.php?status=in_transit" class="btn <?php echo $status_filter === 'in_transit' ? 'btn-primary' : 'btn-secondary'; ?> btn-sm">
-                            <i class="fas fa-shipping-fast"></i> In Transit
-                        </a>
-                        <a href="repairs.php?status=delivered" class="btn <?php echo $status_filter === 'delivered' ? 'btn-primary' : 'btn-secondary'; ?> btn-sm">
-                            <i class="fas fa-hand-holding"></i> Delivered
-                        </a>
-                        <a href="repairs.php?status=rejected" class="btn <?php echo $status_filter === 'rejected' ? 'btn-primary' : 'btn-secondary'; ?> btn-sm">
-                            <i class="fas fa-ban"></i> Declined
-                        </a>
+                        <a href="repairs.php" class="btn <?php echo !$status_filter && !$technician_filter ? 'btn-primary' : 'btn-secondary'; ?> btn-sm">All active</a>
+                        <?php if ($status_filter): ?>
+                            <span class="badge" style="background: <?php echo REPAIR_STATUS_STYLES[$status_filter][1]; ?>; color: #fff; padding: 6px 12px;">Showing: <?php echo e(repairStatusLabel($status_filter)); ?></span>
+                        <?php endif; ?>
                         
                         <div style="display: flex; align-items: center; gap: 8px; margin-left: 10px;">
                             <label style="font-size: 0.9rem; color: #4a5568;"><i class="fas fa-user-cog"></i> Technician:</label>
@@ -538,7 +395,7 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
                                     </div>
                                     <div style="text-align: right;">
                                         <span class="badge status-<?php echo $repair['status']; ?>" style="padding: 5px 12px; border-radius: 20px;">
-                                            <?php echo ucfirst(str_replace('_', ' ', $repair['status'])); ?>
+                                            <?php echo e(repairStatusLabel($repair['status'])); ?>
                                         </span>
                                         <div style="font-size: 0.8rem; color: #718096; margin-top: 5px;">
                                             <?php echo date('M d, Y', strtotime($repair['received_date'])); ?>
@@ -580,6 +437,11 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
                                         <?php endif; ?>
                                         <?php if ($repair['final_cost']): ?>
                                             | Final: <strong>K<?php echo number_format($repair['final_cost'], 2); ?></strong>
+                                            <?php if ($repair['payment_status'] === 'paid'): ?>
+                                                <span class="badge" style="background: #38a169; color: #fff; margin-left: 6px;">Paid</span>
+                                            <?php else: ?>
+                                                <span class="badge" style="background: #dd6b20; color: #fff; margin-left: 6px;">Unpaid<?php echo $repair['payment_method'] === 'cash' ? ' - pay on collection' : ''; ?></span>
+                                            <?php endif; ?>
                                         <?php endif; ?>
                                     </div>
                                     
@@ -615,15 +477,27 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
                                             </button>
                                         <?php endif; ?>
 
+                                        <?php if ($repair['final_cost'] > 0 && $repair['payment_status'] !== 'paid' && !in_array($repair['status'], ['pending_approval', 'rejected', 'cancelled'], true)): ?>
+                                            <button class="status-btn" style="background: #38a169; color: #fff;" onclick="recordPayment(<?php echo $repair['id']; ?>, '<?php echo e($repair['ticket_number']); ?>', '<?php echo number_format($repair['final_cost'], 2); ?>')">
+                                                <i class="fas fa-cash-register"></i> Record Payment
+                                            </button>
+                                        <?php elseif ($repair['payment_status'] === 'paid'): ?>
+                                            <a class="action-btn" href="receipt.php?source=repair&amp;id=<?php echo $repair['id']; ?>" target="_blank" title="View / print receipt" style="background: #38a169; color: #fff;">
+                                                <i class="fas fa-receipt"></i>
+                                            </a>
+                                        <?php endif; ?>
+
                                         <button class="action-btn" onclick="viewSolutions(<?php echo $repair['id']; ?>)" title="View Solutions" style="background: #667eea;">
                                             <i class="fas fa-lightbulb"></i>
                                         </button>
                                         <button class="action-btn edit" onclick='editRepair(<?php echo htmlspecialchars(json_encode($repair), ENT_QUOTES, "UTF-8"); ?>)' title="Edit">
                                             <i class="fas fa-edit"></i>
                                         </button>
-                                        <button class="action-btn delete" onclick="deleteRepair(<?php echo $repair['id']; ?>, '<?php echo htmlspecialchars($repair['ticket_number']); ?>')" title="Delete">
+                                        <?php if (isAdmin()): ?>
+                                        <button class="action-btn delete" onclick="deleteRepair(<?php echo $repair['id']; ?>, '<?php echo htmlspecialchars($repair['ticket_number'], ENT_QUOTES); ?>')" title="Delete">
                                             <i class="fas fa-trash"></i>
                                         </button>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                             </div>
@@ -806,6 +680,36 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
         </div>
     </div>
     
+    <!-- Record Payment Modal -->
+    <div class="modal-overlay" id="paymentModal">
+        <div class="modal" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-cash-register"></i> Record Payment</h3>
+                <button class="modal-close" onclick="document.getElementById('paymentModal').classList.remove('active')">&times;</button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="record_payment">
+                    <input type="hidden" name="id" id="paymentRepairId">
+                    <p id="paymentMessage"></p>
+                    <div class="form-group">
+                        <label>Payment Method</label>
+                        <select name="payment_method" class="form-control" required>
+                            <?php foreach (PAYMENT_METHODS as $method => $label): ?>
+                                <option value="<?php echo $method; ?>"><?php echo e($label); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <p style="font-size: 0.85rem; color: #718096;">A receipt is generated automatically and emailed to the customer.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('paymentModal').classList.remove('active')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="background: #38a169;"><i class="fas fa-check"></i> Record Payment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Delete Form -->
     <form id="deleteForm" method="POST" style="display: none;">
         <input type="hidden" name="action" value="delete">
@@ -888,6 +792,12 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
             document.getElementById('statusModal').classList.remove('active');
         }
         
+        function recordPayment(id, ticket, amount) {
+            document.getElementById('paymentRepairId').value = id;
+            document.getElementById('paymentMessage').textContent = 'Record payment of K' + amount + ' for ticket ' + ticket + '?';
+            document.getElementById('paymentModal').classList.add('active');
+        }
+
         function deleteRepair(id, ticket) {
             if (confirm('Are you sure you want to delete repair ticket "' + ticket + '"?')) {
                 document.getElementById('deleteId').value = id;

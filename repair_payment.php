@@ -1,6 +1,7 @@
 <?php
 require_once 'config/database.php';
 require_once 'config/session.php';
+require_once 'config/receipts.php';
 requireLogin();
 
 $user = getCurrentUser();
@@ -14,100 +15,55 @@ if (!isCustomer()) {
 $repair_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $message = '';
 $error = '';
+$receipt_id = null;
 
-// Get repair details
-$stmt = $conn->prepare("SELECT r.*, u.full_name FROM repairs r LEFT JOIN users u ON r.customer_id = u.id WHERE r.id = ? AND r.customer_id = ?");
-$stmt->bind_param("ii", $repair_id, $user['id']);
-$stmt->execute();
-$repair = $stmt->get_result()->fetch_assoc();
+function loadCustomerRepair($conn, $repair_id, $customer_id) {
+    $stmt = $conn->prepare("SELECT r.*, u.full_name FROM repairs r LEFT JOIN users u ON r.customer_id = u.id WHERE r.id = ? AND r.customer_id = ?");
+    $stmt->bind_param("ii", $repair_id, $customer_id);
+    $stmt->execute();
+    return $stmt->get_result()->fetch_assoc();
+}
 
-if (!$repair) {
+$repair = loadCustomerRepair($conn, $repair_id, $user['id']);
+
+if (!$repair || in_array($repair['status'], ['pending_approval', 'rejected', 'cancelled'], true)) {
     header('Location: customer_dashboard.php');
     exit();
 }
 
 // Handle payment submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $payment_method = $_POST['payment_method'];
+    $payment_method = $_POST['payment_method'] ?? '';
     
-    if (empty($payment_method)) {
+    if (!isset(PAYMENT_METHODS[$payment_method])) {
         $error = 'Please select a payment method.';
+    } elseif ((float)$repair['final_cost'] <= 0) {
+        $error = 'The final cost for this repair has not been set yet.';
+    } elseif ($payment_method === 'cash') {
+        // Pay on collection: staff record the payment at the counter, which issues the receipt
+        $stmt = $conn->prepare("UPDATE repairs SET payment_method = 'cash' WHERE id = ? AND payment_status <> 'paid'");
+        $stmt->bind_param("i", $repair_id);
+        $stmt->execute();
+        $message = 'You chose to pay on collection. Please pay at our shop when you collect your device - your receipt will be emailed once payment is received.';
     } else {
-        // Update repair payment status
-        $update_stmt = $conn->prepare("UPDATE repairs SET payment_method = ?, payment_status = 'paid', payment_date = NOW() WHERE id = ?");
-        $update_stmt->bind_param("si", $payment_method, $repair_id);
-        
-        if ($update_stmt->execute()) {
-            $message = "Payment processed successfully! Your repair payment has been recorded.";
-            
-            // Send payment confirmation email
-            $subject = "Payment Received - Repair Ticket {$repair['ticket_number']}";
-            
-            $body = "
-            <html>
-            <head>
-                <style>
-                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                    .header { background: linear-gradient(135deg, #1a365d, #2d3748); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
-                    .content { background: #f7fafc; padding: 30px; border: 1px solid #e2e8f0; }
-                    .payment-badge { background: #38a169; color: white; padding: 15px; border-radius: 5px; text-align: center; font-size: 18px; margin: 20px 0; }
-                    .details { background: #fff; padding: 15px; border-radius: 5px; border: 1px solid #e2e8f0; }
-                    .footer { background: #edf2f7; padding: 15px; text-align: center; font-size: 12px; color: #718096; border-radius: 0 0 10px 10px; }
-                </style>
-            </head>
-            <body>
-                <div class='container'>
-                    <div class='header'>
-                        <h1>Sims-Tech Zambia</h1>
-                        <p>Payment Confirmation</p>
-                    </div>
-                    <div class='content'>
-                        <h2>Payment Received</h2>
-                        <p>Hello <strong>{$user['full_name']}</strong>,</p>
-                        <p>Your payment for repair ticket <strong>{$repair['ticket_number']}</strong> has been successfully received.</p>
-                        
-                        <div class='payment-badge'>
-                            <i class='fas fa-check-circle'></i> Payment Completed
-                        </div>
-                        
-                        <div class='details'>
-                            <p><strong>Ticket:</strong> {$repair['ticket_number']}</p>
-                            <p><strong>Device:</strong> {$repair['device_type']}";
-            if ($repair['device_brand']) $body .= " - {$repair['device_brand']}";
-            if ($repair['device_model']) $body .= " {$repair['device_model']}";
-            $body .= "</p>
-                            <p><strong>Payment Method:</strong> " . ucfirst($payment_method) . "</p>
-                            <p><strong>Amount:</strong> K" . number_format($repair['final_cost'], 2) . "</p>
-                            <p><strong>Payment Date:</strong> " . date('M d, Y H:i') . "</p>
-                        </div>
-                        
-                        <p>Thank you for your payment. Your device is ready for collection once the repair is completed.</p>
-                        
-                        <p style='text-align: center; margin-top: 20px;'>
-                            <a href='" . SYSTEM_URL . "/customer_dashboard.php' style='display: inline-block; background: #48bb78; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px;'>View Dashboard</a>
-                        </p>
-                    </div>
-                    <div class='footer'>
-                        <p>&copy; " . date('Y') . " Sims-Tech Zambia. All rights reserved.</p>
-                        <p>For questions, contact us at info@actechnology.co.zm</p>
-                    </div>
-                </div>
-            </body>
-            </html>";
-            
-            require_once 'config/email.php';
-            sendEmail($user['email'], $subject, $body);
-            
-            // Refresh repair data
-            $stmt = $conn->prepare("SELECT r.*, u.full_name FROM repairs r LEFT JOIN users u ON r.customer_id = u.id WHERE r.id = ? AND r.customer_id = ?");
-            $stmt->bind_param("ii", $repair_id, $user['id']);
-            $stmt->execute();
-            $repair = $stmt->get_result()->fetch_assoc();
+        // Mark paid only once (guards against double submission)
+        $stmt = $conn->prepare("UPDATE repairs SET payment_method = ?, payment_status = 'paid', payment_date = NOW() WHERE id = ? AND customer_id = ? AND payment_status <> 'paid' AND final_cost > 0");
+        $stmt->bind_param("sii", $payment_method, $repair_id, $user['id']);
+        $stmt->execute();
+
+        if ($stmt->affected_rows === 1) {
+            $receipt_id = issueReceipt($conn, 'repair', $repair_id);
+            $message = 'Payment processed successfully! Your receipt has been emailed to you.';
         } else {
-            $error = 'Error processing payment. Please try again.';
+            $error = 'This repair has already been paid for.';
         }
     }
+    $repair = loadCustomerRepair($conn, $repair_id, $user['id']);
+}
+
+if (!$receipt_id && $repair['payment_status'] === 'paid') {
+    $existing_receipt = getReceiptForSource($conn, 'repair', $repair_id);
+    $receipt_id = $existing_receipt['id'] ?? null;
 }
 ?>
 <!DOCTYPE html>
@@ -115,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pay for Repair - Sims-Tech Zambia</title>
+    <title>Pay for Repair - <?php echo e(companyName()); ?></title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -193,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
     <div class="customer-container">
         <div class="customer-header">
-            <img src="assets/images/sims-tech-logo.jpg" alt="Sims-Tech Zambia Logo" onerror="this.style.display='none'" style="max-height: 60px; margin-bottom: 15px;">
+            <img src="<?php echo e(companyLogo()); ?>" alt="<?php echo e(companyName()); ?> Logo" onerror="this.style.display='none'" style="max-height: 60px; margin-bottom: 15px;">
             <h1><i class="fas fa-credit-card"></i> Pay for Repair</h1>
             <p>Complete payment for your repair service</p>
         </div>
@@ -213,8 +169,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php if ($repair['payment_status'] === 'paid'): ?>
             <div class="alert alert-success" style="text-align: center; padding: 30px;">
                 <i class="fas fa-check-circle" style="font-size: 3rem; margin-bottom: 15px;"></i>
-                <h3>Payment Already Completed</h3>
-                <p>This repair has already been paid for on <?php echo date('M d, Y H:i', strtotime($repair['payment_date'])); ?>.</p>
+                <h3>Payment Completed</h3>
+                <p>This repair was paid for on <?php echo date('M d, Y H:i', strtotime($repair['payment_date'])); ?>.</p>
+                <?php if ($receipt_id): ?>
+                    <a href="receipt.php?id=<?php echo (int)$receipt_id; ?>" class="btn btn-success" style="margin-top: 20px;">
+                        <i class="fas fa-receipt"></i> View / Print Receipt
+                    </a>
+                <?php endif; ?>
                 <a href="customer_dashboard.php" class="btn btn-primary" style="margin-top: 20px;">
                     <i class="fas fa-tachometer-alt"></i> Back to Dashboard
                 </a>
@@ -237,7 +198,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <?php if ($repair['device_model']): ?> <?php echo htmlspecialchars($repair['device_model']); ?><?php endif; ?>
                 </p>
                 <p><strong>Problem:</strong> <?php echo htmlspecialchars($repair['problem_description']); ?></p>
-                <p><strong>Status:</strong> <?php echo ucfirst(str_replace('_', ' ', $repair['status'])); ?></p>
+                <p><strong>Status:</strong> <?php echo e(repairStatusLabel($repair['status'])); ?></p>
                 <p><strong>Final Cost:</strong> <span style="font-size: 1.5rem; color: #38a169; font-weight: 700;">K<?php echo number_format($repair['final_cost'], 2); ?></span></p>
             </div>
             

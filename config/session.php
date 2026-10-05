@@ -4,6 +4,13 @@ session_start();
 // Internal (staff) roles - all of these can use the inventory system and handle repair requests
 define('STAFF_ROLES', ['admin', 'employee', 'technician', 'sales']);
 define('USER_ROLES', array_merge(STAFF_ROLES, ['customer']));
+define('ROLE_LABELS', [
+    'admin' => 'Admin',
+    'employee' => 'Employee',
+    'technician' => 'Technician',
+    'sales' => 'Sales Person',
+    'customer' => 'Customer',
+]);
 
 // Include additional access control
 require_once __DIR__ . '/access_control.php';
@@ -70,6 +77,16 @@ function setUserSession($user) {
     $_SESSION['username'] = $user['username'];
     $_SESSION['full_name'] = $user['full_name'];
     $_SESSION['role'] = $user['role'];
+    $_SESSION['must_change_password'] = !empty($user['must_change_password']);
+}
+
+// Landing page for the current user
+function homePage() {
+    return isStaff() ? 'dashboard.php' : 'customer_dashboard.php';
+}
+
+function roleLabel($role) {
+    return ROLE_LABELS[$role] ?? ucfirst((string)$role);
 }
 
 // Destroy session

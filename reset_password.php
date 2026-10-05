@@ -15,7 +15,7 @@ if (isLoggedIn()) {
 
 $message = '';
 $error = '';
-$step = 1; // 1: enter email/username, 2: set new password, 3: success
+$step = 1; // 1: request reset link, 2: set new password (valid emailed token), 3: success
 
 // Create password_resets table if not exists
 $conn->query("CREATE TABLE IF NOT EXISTS password_resets (
@@ -27,81 +27,78 @@ $conn->query("CREATE TABLE IF NOT EXISTS password_resets (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )");
 
+// Tokens are stored hashed; only the emailed link contains the real token
+function findValidReset($conn, $token) {
+    if (!preg_match('/^[a-f0-9]{64}$/', $token)) {
+        return null;
+    }
+    $hash = hash('sha256', $token);
+    $stmt = $conn->prepare("SELECT pr.id, pr.user_id, u.username FROM password_resets pr JOIN users u ON u.id = pr.user_id
+                            WHERE pr.token = ? AND pr.used = 0 AND pr.expires_at > NOW() LIMIT 1");
+    $stmt->bind_param("s", $hash);
+    $stmt->execute();
+    return $stmt->get_result()->fetch_assoc();
+}
+
+$token = $_POST['token'] ?? $_GET['token'] ?? '';
+$reset = $token !== '' ? findValidReset($conn, $token) : null;
+if ($token !== '') {
+    $step = $reset ? 2 : 1;
+    if (!$reset) {
+        $error = 'This reset link is invalid or has expired. Please request a new one.';
+    }
+}
+
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     if (isset($_POST['verify_user'])) {
-        // Step 1: Verify user exists by email or username
-        $identifier = trim($_POST['identifier']);
+        // Step 1: Email a reset link (same response whether or not the account exists)
+        $identifier = trim($_POST['identifier'] ?? '');
         
         if (empty($identifier)) {
             $error = 'Please enter your email address or username.';
         } else {
-            // Find user by email OR username
-            $stmt = $conn->prepare("SELECT id, username, full_name, email FROM users WHERE email = ? OR username = ?");
+            $stmt = $conn->prepare("SELECT id, username, email FROM users WHERE email = ? OR username = ? LIMIT 1");
             $stmt->bind_param("ss", $identifier, $identifier);
             $stmt->execute();
-            $result = $stmt->get_result();
+            $user = $stmt->get_result()->fetch_assoc();
             
-            if ($result->num_rows === 1) {
-                $user = $result->fetch_assoc();
-                // Store user ID in session for password reset
-                $_SESSION['reset_user_id'] = $user['id'];
-                $_SESSION['reset_username'] = $user['username'];
-                
-                // Try to send email notification
-                if (!empty($user['email'])) {
-                    $token = bin2hex(random_bytes(32));
-                    $expires_at = date('Y-m-d H:i:s', strtotime('+1 hour'));
-                    $stmt2 = $conn->prepare("INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)");
-                    $stmt2->bind_param("iss", $user['id'], $token, $expires_at);
-                    $stmt2->execute();
-                    
-                    // Send email (non-blocking - reset still works even if email fails)
-                    @sendPasswordResetEmail($user['email'], $user['username'], $token);
-                }
-                
-                $step = 2; // Go to password reset form
-            } else {
-                $error = 'No account found with this email or username.';
+            if ($user && filter_var($user['email'], FILTER_VALIDATE_EMAIL)) {
+                $new_token = bin2hex(random_bytes(32));
+                $hash = hash('sha256', $new_token);
+                $expires_at = date('Y-m-d H:i:s', strtotime('+1 hour'));
+                $conn->query("UPDATE password_resets SET used = 1 WHERE user_id = " . (int)$user['id'] . " AND used = 0");
+                $stmt2 = $conn->prepare("INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)");
+                $stmt2->bind_param("iss", $user['id'], $hash, $expires_at);
+                $stmt2->execute();
+                sendPasswordResetEmail($user['email'], $user['username'], $new_token);
             }
+            $message = 'If an account matches what you entered, a password reset link has been sent to its email address. The link expires in 1 hour.';
+            $error = '';
         }
         
     } elseif (isset($_POST['reset_password'])) {
-        // Step 2: Reset the password
+        // Step 2: Reset the password using a valid emailed token
         $new_password = $_POST['new_password'] ?? '';
         $confirm_password = $_POST['confirm_password'] ?? '';
         
-        // Check if reset session is valid
-        if (!isset($_SESSION['reset_user_id'])) {
-            $error = 'Session expired. Please start over.';
+        if (!$reset) {
             $step = 1;
-        } elseif (empty($new_password) || empty($confirm_password)) {
-            $error = 'Please fill in all password fields.';
-            $step = 2;
-        } elseif (strlen($new_password) < 6) {
-            $error = 'Password must be at least 6 characters long.';
+        } elseif (strlen($new_password) < 8) {
+            $error = 'Password must be at least 8 characters long.';
             $step = 2;
         } elseif ($new_password !== $confirm_password) {
             $error = 'Passwords do not match.';
             $step = 2;
         } else {
-            // Update password in database
             $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
-            $stmt = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
-            $stmt->bind_param("si", $hashed_password, $_SESSION['reset_user_id']);
+            $stmt = $conn->prepare("UPDATE users SET password = ?, must_change_password = 0 WHERE id = ?");
+            $stmt->bind_param("si", $hashed_password, $reset['user_id']);
             
             if ($stmt->execute()) {
+                $conn->query("UPDATE password_resets SET used = 1 WHERE user_id = " . (int)$reset['user_id']);
                 $message = 'Password reset successfully! Redirecting to login...';
-                
-                // Clear session variables
-                $reset_username = $_SESSION['reset_username'] ?? '';
-                unset($_SESSION['reset_user_id']);
-                unset($_SESSION['reset_email']);
-                unset($_SESSION['reset_username']);
-                unset($_SESSION['reset_token']);
-                
-                // Redirect to login after 3 seconds
                 header('refresh:3;url=login.php');
                 $step = 3; // Success state
             } else {
@@ -110,12 +107,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     }
-} else {
-    // GET request - clear any previous reset session data
-    unset($_SESSION['reset_user_id']);
-    unset($_SESSION['reset_email']);
-    unset($_SESSION['reset_username']);
-    unset($_SESSION['reset_token']);
 }
 
 ?>
@@ -124,7 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reset Password - Sims-Tech Zambia</title>
+    <title>Reset Password - <?php echo e(companyName()); ?></title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -343,7 +334,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
     <div class="reset-container">
         <div class="reset-header">
-            <img src="assets/images/sims-tech-logo.jpg" alt="Sims-Tech Zambia Logo" onerror="this.style.display='none'">
+            <img src="<?php echo e(companyLogo()); ?>" alt="<?php echo e(companyName()); ?> Logo" onerror="this.style.display='none'">
             <h2>Reset Password</h2>
             <p>Follow the steps to reset your password</p>
         </div>
@@ -377,22 +368,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
                 
                 <button type="submit" name="verify_user" class="btn btn-primary">
-                    <i class="fas fa-arrow-right"></i> Continue
+                    <i class="fas fa-paper-plane"></i> Email Me a Reset Link
                 </button>
             </form>
             
         <?php elseif ($step === 2): ?>
             <!-- Step 2: Set New Password -->
             <div class="user-info">
-                <p>Resetting password for: <strong><?php echo htmlspecialchars($_SESSION['reset_username'] ?? ''); ?></strong></p>
+                <p>Resetting password for: <strong><?php echo e($reset['username'] ?? ''); ?></strong></p>
             </div>
             
             <form method="POST" action="reset_password.php">
+                <input type="hidden" name="token" value="<?php echo e($token); ?>">
                 <div class="form-group">
                     <label for="new_password">New Password</label>
                     <div class="password-input-container">
                         <input type="password" id="new_password" name="new_password" required 
-                               placeholder="Enter new password (min. 6 characters)">
+                               placeholder="Enter new password (min. 8 characters)" minlength="8">
                         <button type="button" class="password-toggle" onclick="togglePassword('new_password')">
                             <i class="fas fa-eye" id="new_password-toggle-icon"></i>
                         </button>

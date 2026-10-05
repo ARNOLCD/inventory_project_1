@@ -3,8 +3,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
 ?>
 <aside class="sidebar">
     <div class="sidebar-header">
-        <img src="assets/images/sims-tech-logo.jpg" alt="Sims-Tech Zambia Logo" onerror="this.style.display='none'">
-        <h2>Sims-Tech Zambia</h2>
+        <img src="<?php echo e(companyLogo()); ?>" alt="<?php echo e(companyName()); ?> Logo" onerror="this.style.display='none'">
+        <h2><?php echo e(companyName()); ?></h2>
     </div>
     <nav class="sidebar-menu">
         <?php if (isCustomer()): ?>
@@ -72,8 +72,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <span class="menu-section-title">Repairs</span>
             </div>
             <?php
-            $pending_requests_result = $conn->query("SELECT COUNT(*) as c FROM repairs WHERE status = 'pending_approval'");
-            $pending_requests_count = $pending_requests_result ? (int)$pending_requests_result->fetch_assoc()['c'] : 0;
+            // Shared with the header notification bell (one query for both)
+            require_once __DIR__ . '/../config/alerts.php';
+            $staff_notifications = $staff_notifications ?? getStaffNotifications($conn);
+            $pending_requests_count = $staff_notifications['pending_requests'];
             ?>
             <a href="repair_requests.php" class="<?php echo $current_page === 'repair_requests.php' ? 'active' : ''; ?>">
                 <i class="fas fa-inbox"></i> Repair Requests
@@ -125,13 +127,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <i class="fas fa-users"></i> Users
             </a>
             <a href="settings.php" class="<?php echo $current_page === 'settings.php' ? 'active' : ''; ?>">
-                <i class="fas fa-cog"></i> Settings
+                <i class="fas fa-sliders-h"></i> System Information
             </a>
             <a href="backup.php" class="<?php echo $current_page === 'backup.php' ? 'active' : ''; ?>">
                 <i class="fas fa-database"></i> Backup
-            </a>
-            <a href="email_settings.php" class="<?php echo $current_page === 'email_settings.php' ? 'active' : ''; ?>">
-                <i class="fas fa-envelope"></i> Email Settings
             </a>
             <?php endif; ?>
 

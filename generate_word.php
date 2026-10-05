@@ -167,7 +167,7 @@ header("Expires: 0");
     <table class="header-table">
         <tr>
             <td style="vertical-align: top; width: 60%;">
-                <div class="company-name">Sims-Tech Zambia LIMITED</div>
+                <div class="company-name"><?php echo e(companyName()); ?></div>
                 <div class="tagline">SAVINGS THROUGH MAINTENANCE OF YOUR COMPUTERS</div>
             </td>
             <td style="vertical-align: top; width: 40%;">
@@ -196,7 +196,7 @@ header("Expires: 0");
             <td style="vertical-align: top; width: 50%;">
                 <div class="bank-title">BANK DETAILS</div>
                 <p><strong>BANK:</strong> <?php echo htmlspecialchars($company['bank_name'] ?? 'STANBIC'); ?></p>
-                <p><strong>ACCOUNT NAME:</strong> <?php echo htmlspecialchars($company['account_name'] ?? 'Sims-Tech Zambia'); ?></p>
+                <p><strong>ACCOUNT NAME:</strong> <?php echo htmlspecialchars($company['account_name'] ?? companyName()); ?></p>
                 <p><strong>Account No:</strong> <?php echo htmlspecialchars($company['account_number'] ?? '6292984114'); ?></p>
                 <p><strong>BRANCH:</strong> <?php echo htmlspecialchars($company['branch'] ?? '260006'); ?></p>
                 <p><strong>PAY TO SALE:</strong> <?php echo htmlspecialchars($company['pay_to_sale'] ?? '0973071800'); ?></p>
@@ -262,7 +262,7 @@ header("Expires: 0");
     </table>
     
     <div class="footer">
-        <p><strong>Sims-Tech Zambia LIMITED</strong></p>
+        <p><strong><?php echo e(companyName()); ?></strong></p>
         
         <?php if ($document['notes']): ?>
             <p style="margin-top: 8pt;"><strong>Notes:</strong> <?php echo nl2br(htmlspecialchars($document['notes'])); ?></p>

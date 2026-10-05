@@ -1,6 +1,7 @@
 <?php
 require_once 'config/database.php';
 require_once 'config/session.php';
+require_once 'config/alerts.php';
 requireLogin();
 
 $user = getCurrentUser();
@@ -57,10 +58,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_customer_view) {
         if ($action === 'add') {
             $sql = "INSERT INTO products (serial_number, name, description, specifications, category_id, price, cost_price, quantity, min_stock_level, image, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt = $conn->prepare($sql);
-            $stmt->bind_param("ssssiidisss", $serial_number, $name, $description, $specifications, $category_id, $price, $cost_price, $quantity, $min_stock_level, $image, $status);
+            $stmt->bind_param("ssssiddiiss", $serial_number, $name, $description, $specifications, $category_id, $price, $cost_price, $quantity, $min_stock_level, $image, $status);
 
             if ($stmt->execute()) {
                 $message = 'Product added successfully!';
+                checkLowStock($conn, [$conn->insert_id]);
             } else {
                 $error = 'Error adding product: ' . $conn->error;
             }
@@ -68,15 +70,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_customer_view) {
             if ($image) {
                 $sql = "UPDATE products SET serial_number=?, name=?, description=?, specifications=?, category_id=?, price=?, cost_price=?, quantity=?, min_stock_level=?, image=?, status=? WHERE id=?";
                 $stmt = $conn->prepare($sql);
-                $stmt->bind_param("ssssiidisssi", $serial_number, $name, $description, $specifications, $category_id, $price, $cost_price, $quantity, $min_stock_level, $image, $status, $id);
+                $stmt->bind_param("ssssiddiissi", $serial_number, $name, $description, $specifications, $category_id, $price, $cost_price, $quantity, $min_stock_level, $image, $status, $id);
             } else {
                 $sql = "UPDATE products SET serial_number=?, name=?, description=?, specifications=?, category_id=?, price=?, cost_price=?, quantity=?, min_stock_level=?, status=? WHERE id=?";
                 $stmt = $conn->prepare($sql);
-                $stmt->bind_param("ssssiidissi", $serial_number, $name, $description, $specifications, $category_id, $price, $cost_price, $quantity, $min_stock_level, $status, $id);
+                $stmt->bind_param("ssssiddiisi", $serial_number, $name, $description, $specifications, $category_id, $price, $cost_price, $quantity, $min_stock_level, $status, $id);
             }
 
             if ($stmt->execute()) {
                 $message = 'Product updated successfully!';
+                checkLowStock($conn, [(int)$id]);
             } else {
                 $error = 'Error updating product: ' . $conn->error;
             }
@@ -122,7 +125,7 @@ $categories = $conn->query("
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Products - Sims-Tech Zambia</title>
+    <title>Products - <?php echo e(companyName()); ?></title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -133,7 +136,7 @@ $categories = $conn->query("
         <!-- Customer View -->
         <div class="customer-container">
             <div class="customer-header">
-                <img src="assets/images/sims-tech-logo.jpg" alt="Sims-Tech Zambia Logo" onerror="this.style.display='none'" style="max-height: 60px; margin-bottom: 15px;">
+                <img src="<?php echo e(companyLogo()); ?>" alt="<?php echo e(companyName()); ?> Logo" onerror="this.style.display='none'" style="max-height: 60px; margin-bottom: 15px;">
                 <h1><i class="fas fa-shopping-cart"></i> Our Products</h1>
                 <p>Browse and purchase quality laptops and electronics</p>
                 <div style="margin-top: 20px;">

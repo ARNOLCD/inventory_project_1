@@ -1,12 +1,14 @@
 <?php
 require_once 'config/database.php';
 
-// Get company info
-$company_result = $conn->query("SELECT * FROM company_info LIMIT 1");
-$company = $company_result->fetch_assoc();
+// Get company info (managed under System Information)
+$company = companyInfo();
+$social_links = array_filter(['facebook-f' => $company['facebook'] ?? '', 'twitter' => $company['twitter'] ?? '', 'instagram' => $company['instagram'] ?? '']);
+$whatsapp = preg_replace('/[^0-9]/', '', getSetting('whatsapp'));
 
-// Get active services
-$services_result = $conn->query("SELECT * FROM services WHERE status = 'active' ORDER BY id ASC LIMIT 8");
+// Get active services (managed in services.php)
+$services_result = $conn->query("SELECT * FROM services WHERE status = 'active' ORDER BY id ASC");
+$footer_services = $conn->query("SELECT name FROM services WHERE status = 'active' ORDER BY id ASC LIMIT 5")->fetch_all(MYSQLI_ASSOC);
 
 // Get active products (remove duplicates by name, keep first occurrence)
 $products_result = $conn->query("
@@ -40,7 +42,7 @@ $categories_result = $conn->query("
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo htmlspecialchars($company['name'] ?? 'Sims-Tech Zambia'); ?> - Your Trusted Technology Partner</title>
+    <title><?php echo htmlspecialchars($company['name'] ?? '<?php echo e(companyName()); ?>'); ?> - Your Trusted Technology Partner</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -483,8 +485,8 @@ $categories_result = $conn->query("
     <nav class="navbar">
         <div class="container">
             <a href="index.php" class="navbar-brand">
-                <img src="assets/images/sims-tech-logo.jpg" alt="Sims-Tech Zambia Logo" onerror="this.style.display='none'">
-                <span>Sims-Tech Zambia</span>
+                <img src="<?php echo e(companyLogo()); ?>" alt="<?php echo e(companyName()); ?> Logo" onerror="this.style.display='none'">
+                <span><?php echo e(companyName()); ?></span>
             </a>
             <ul class="nav-links">
                 <li><a href="#home" class="nav-red">Home</a></li>
@@ -518,11 +520,11 @@ $categories_result = $conn->query("
         
         <!-- Floating Logos and Images -->
         <div class="floating-logos">
-            <img src="assets/images/sims-tech-logo.jpg" alt="" class="floating-logo floating-logo-1" onerror="this.style.display='none'">
-            <img src="assets/images/sims-tech-logo.jpg" alt="" class="floating-logo floating-logo-2" onerror="this.style.display='none'">
-            <img src="assets/images/sims-tech-logo.jpg" alt="" class="floating-logo floating-logo-3" onerror="this.style.display='none'">
-            <img src="assets/images/sims-tech-logo.jpg" alt="" class="floating-logo floating-logo-4" onerror="this.style.display='none'">
-            <img src="assets/images/sims-tech-logo.jpg" alt="" class="floating-logo floating-logo-5" onerror="this.style.display='none'">
+            <img src="<?php echo e(companyLogo()); ?>" alt="" class="floating-logo floating-logo-1" onerror="this.style.display='none'">
+            <img src="<?php echo e(companyLogo()); ?>" alt="" class="floating-logo floating-logo-2" onerror="this.style.display='none'">
+            <img src="<?php echo e(companyLogo()); ?>" alt="" class="floating-logo floating-logo-3" onerror="this.style.display='none'">
+            <img src="<?php echo e(companyLogo()); ?>" alt="" class="floating-logo floating-logo-4" onerror="this.style.display='none'">
+            <img src="<?php echo e(companyLogo()); ?>" alt="" class="floating-logo floating-logo-5" onerror="this.style.display='none'">
             
             <!-- Additional Tech Images -->
             <div class="floating-icon floating-icon-1">
@@ -552,8 +554,8 @@ $categories_result = $conn->query("
         </div>
         
         <div class="hero-content">
-            <img src="assets/images/sims-tech-logo.jpg" alt="Sims-Tech Zambia Logo" class="hero-logo" onerror="this.src='https://via.placeholder.com/200x200?text=Sims-Tech'">
-            <h1><?php echo htmlspecialchars($company['name'] ?? 'Sims-Tech Zambia'); ?></h1>
+            <img src="<?php echo e(companyLogo()); ?>" alt="<?php echo e(companyName()); ?> Logo" class="hero-logo" onerror="this.src='https://via.placeholder.com/200x200?text=Sims-Tech'">
+            <h1><?php echo htmlspecialchars($company['name'] ?? companyName()); ?></h1>
             <p><?php echo htmlspecialchars($company['tagline'] ?? 'We sale New and Preowned Laptops from UK and Provide Repair Service for all types of Computers and Phones'); ?></p>
             <div class="hero-buttons">
                 <a href="#products" class="btn btn-bright-orange"><i class="fas fa-shopping-cart"></i> Shop Now</a>
@@ -711,11 +713,11 @@ $categories_result = $conn->query("
         <div class="container">
             <div class="about-content">
                 <div class="about-image" data-animate="slideInLeft">
-                    <img src="assets/images/sims-tech-logo.jpg" alt="About Sims-Tech Zambia" style="max-width: 400px; margin: 0 auto; display: block;" onerror="this.src='https://via.placeholder.com/400x300?text=Sims-Tech'">
+                    <img src="<?php echo e(companyLogo()); ?>" alt="About <?php echo e(companyName()); ?>" style="max-width: 400px; margin: 0 auto; display: block;" onerror="this.src='https://via.placeholder.com/400x300?text=Sims-Tech'">
                 </div>
                 <div class="about-text" data-animate="slideInRight">
-                    <h2>About <?php echo htmlspecialchars($company['name'] ?? 'Sims-Tech Zambia'); ?></h2>
-                    <p><?php echo nl2br(htmlspecialchars($company['about_us'] ?? 'Sims-Tech Zambia is a leading technology solutions provider offering quality electronics, computer accessories, and professional repair services. We are committed to delivering excellent products and services to our valued customers.')); ?></p>
+                    <h2>About <?php echo htmlspecialchars($company['name'] ?? companyName()); ?></h2>
+                    <p><?php echo nl2br(htmlspecialchars($company['about_us'] ?? companyName() . ' is a leading technology solutions provider offering quality electronics, computer accessories, and professional repair services. We are committed to delivering excellent products and services to our valued customers.')); ?></p>
                     <p>We specialize in laptops, power accessories, storage devices, and offer expert repair services for all your electronic devices.</p>
                     <div class="about-features">
                         <div class="about-feature">
@@ -765,9 +767,30 @@ $categories_result = $conn->query("
                         <i class="fas fa-map-marker-alt"></i>
                         <div>
                             <h4>Address</h4>
-                            <p><?php echo htmlspecialchars($company['address'] ?? 'Lusaka, Zambia'); ?></p>
+                            <p><?php echo nl2br(e($company['address'] ?? 'Lusaka, Zambia')); ?></p>
+                            <?php if (getSetting('map_link')): ?>
+                                <p><a href="<?php echo e(getSetting('map_link')); ?>" target="_blank" rel="noopener"><i class="fas fa-directions"></i> Get directions</a></p>
+                            <?php endif; ?>
                         </div>
                     </div>
+                    <?php if (getSetting('working_hours')): ?>
+                    <div class="contact-item">
+                        <i class="fas fa-clock"></i>
+                        <div>
+                            <h4>Working Hours</h4>
+                            <p><?php echo e(getSetting('working_hours')); ?></p>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    <?php if ($whatsapp): ?>
+                    <div class="contact-item">
+                        <i class="fab fa-whatsapp"></i>
+                        <div>
+                            <h4>WhatsApp</h4>
+                            <p><a href="https://wa.me/<?php echo e($whatsapp); ?>" target="_blank" rel="noopener"><?php echo e(getSetting('whatsapp')); ?></a></p>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                     <div class="contact-item">
                         <i class="fas fa-phone"></i>
                         <div>
@@ -783,9 +806,9 @@ $categories_result = $conn->query("
                         </div>
                     </div>
                     <div class="social-links" style="margin-top: 2rem;">
-                        <a href="<?php echo htmlspecialchars($company['facebook'] ?? '#'); ?>"><i class="fab fa-facebook-f"></i></a>
-                        <a href="<?php echo htmlspecialchars($company['twitter'] ?? '#'); ?>"><i class="fab fa-twitter"></i></a>
-                        <a href="<?php echo htmlspecialchars($company['instagram'] ?? '#'); ?>"><i class="fab fa-instagram"></i></a>
+                        <?php foreach ($social_links as $icon => $url): ?>
+                            <a href="<?php echo e($url); ?>" target="_blank" rel="noopener"><i class="fab fa-<?php echo $icon; ?>"></i></a>
+                        <?php endforeach; ?>
                     </div>
                 </div>
                 <div class="contact-form" data-animate="slideInRight">
@@ -820,12 +843,12 @@ $categories_result = $conn->query("
         <div class="container">
             <div class="footer-content">
                 <div class="footer-section">
-                    <h3><?php echo htmlspecialchars($company['name'] ?? 'Sims-Tech Zambia'); ?></h3>
+                    <h3><?php echo htmlspecialchars($company['name'] ?? companyName()); ?></h3>
                     <p><?php echo htmlspecialchars($company['tagline'] ?? 'We sale New and Preowned Laptops from UK and Provide Repair Service for all types of Computers and Phones'); ?></p>
                     <div class="social-links">
-                        <a href="<?php echo htmlspecialchars($company['facebook'] ?? '#'); ?>"><i class="fab fa-facebook-f"></i></a>
-                        <a href="<?php echo htmlspecialchars($company['twitter'] ?? '#'); ?>"><i class="fab fa-twitter"></i></a>
-                        <a href="<?php echo htmlspecialchars($company['instagram'] ?? '#'); ?>"><i class="fab fa-instagram"></i></a>
+                        <?php foreach ($social_links as $icon => $url): ?>
+                            <a href="<?php echo e($url); ?>" target="_blank" rel="noopener"><i class="fab fa-<?php echo $icon; ?>"></i></a>
+                        <?php endforeach; ?>
                     </div>
                 </div>
                 <div class="footer-section">
@@ -841,10 +864,9 @@ $categories_result = $conn->query("
                 <div class="footer-section">
                     <h3>Our Services</h3>
                     <ul class="footer-links">
-                        <li><a href="#services">Laptop Repair</a></li>
-                        <li><a href="#services">Phone Repair</a></li>
-                        <li><a href="#services">Passport Photos</a></li>
-                        <li><a href="#services">Printing Services</a></li>
+                        <?php foreach ($footer_services as $footer_service): ?>
+                            <li><a href="#services"><?php echo e($footer_service['name']); ?></a></li>
+                        <?php endforeach; ?>
                     </ul>
                 </div>
                 <div class="footer-section">
@@ -857,7 +879,7 @@ $categories_result = $conn->query("
                 </div>
             </div>
             <div class="footer-bottom">
-                <p>&copy; <?php echo date('Y'); ?> <?php echo htmlspecialchars($company['name'] ?? 'Sims-Tech Zambia'); ?>. All Rights Reserved.</p>
+                <p>&copy; <?php echo date('Y'); ?> <?php echo htmlspecialchars($company['name'] ?? companyName()); ?>. All Rights Reserved.</p>
             </div>
         </div>
     </footer>

@@ -8,8 +8,6 @@ $user = getCurrentUser();
 $message = '';
 $error = '';
 
-ensureUserRoles($conn);
-
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
@@ -20,20 +18,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $full_name = trim($_POST['full_name']);
         $email = trim($_POST['email']);
         $phone = trim($_POST['phone'] ?? '');
-        $role = in_array($_POST['role'] ?? '', USER_ROLES, true) ? $_POST['role'] : 'employee';
-        $password = $_POST['password'];
+        $role = $_POST['role'] ?? '';
+        $password = $_POST['password'] ?? '';
         
-        if ($action === 'add') {
+        if (!in_array($role, USER_ROLES, true)) {
+            $error = 'Please choose a valid role.';
+        } elseif ($password !== '' && strlen($password) < 8) {
+            $error = 'The password must be at least 8 characters long.';
+        } elseif ($action === 'add') {
             // Validate required fields
             if (empty($username)) {
                 $error = 'Username is required.';
-            } elseif (empty($email)) {
-                $error = 'Email is required for new users.';
+            } elseif (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $error = 'A valid email is required for new users.';
             } elseif (empty($full_name)) {
                 $error = 'Full name is required.';
+            } elseif ($password === '') {
+                $error = 'Please set a default password for the new user.';
             } else {
-                // Set default password
-                $default_password = 'AC-techwork123';
+                // Admin-chosen default password; the user must change it at first login
+                $default_password = $password;
                 $hashed_password = password_hash($default_password, PASSWORD_DEFAULT);
                 
                 // Check if username already exists
@@ -53,36 +57,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } elseif ($check_email_result->num_rows > 0) {
                     $error = 'Email "' . htmlspecialchars($email) . '" is already registered to another user.';
                 } else {
-                    $stmt = $conn->prepare("INSERT INTO users (username, password, full_name, email, phone, role) VALUES (?, ?, ?, ?, ?, ?)");
-                    $stmt->bind_param("ssssss", $username, $hashed_password, $full_name, $email, $phone, $role);
+                    $must_change = $role === 'customer' ? 0 : 1;
+                    $stmt = $conn->prepare("INSERT INTO users (username, password, full_name, email, phone, role, must_change_password) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->bind_param("ssssssi", $username, $hashed_password, $full_name, $email, $phone, $role, $must_change);
                     
                     if ($stmt->execute()) {
-                        // Send welcome email with credentials
-                        $emailSent = sendNewUserEmail($email, $username, $default_password, $full_name);
-                        if ($emailSent) {
-                            $message = 'User added successfully! Login credentials sent to <strong>' . htmlspecialchars($email) . '</strong>. Default password: <strong>AC-techwork123</strong> (Ask user to check spam folder if email is not received)';
-                        } else {
-                            $message = 'User added successfully! Email could not be sent. Please share credentials manually — Username: <strong>' . htmlspecialchars($username) . '</strong>, Password: <strong>AC-techwork123</strong>';
-                        }
+                        // Send welcome email with credentials (delivered in the background)
+                        sendNewUserEmail($email, $username, $default_password, $full_name);
+                        $message = 'User <strong>' . e($username) . '</strong> added as <strong>' . e(roleLabel($role)) . '</strong>. Login details are being emailed to <strong>' . e($email) . '</strong>'
+                                 . ($must_change ? '; they will be asked to change the password at first login.' : '.');
                     } else {
                         $error = 'Error adding user. Please try again.';
                     }
                 }
             }
         } else {
-            if (!empty($password)) {
+            if ($id == $user['id'] && $role !== 'admin') {
+                $error = 'You cannot remove the admin role from your own account.';
+            } elseif (!empty($password)) {
+                // Admin reset: staff must choose their own password at next login
                 $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $conn->prepare("UPDATE users SET username=?, password=?, full_name=?, email=?, phone=?, role=? WHERE id=?");
-                $stmt->bind_param("ssssssi", $username, $hashed_password, $full_name, $email, $phone, $role, $id);
+                $must_change = ($role !== 'customer' && $id != $user['id']) ? 1 : 0;
+                $stmt = $conn->prepare("UPDATE users SET username=?, password=?, full_name=?, email=?, phone=?, role=?, must_change_password=? WHERE id=?");
+                $stmt->bind_param("ssssssii", $username, $hashed_password, $full_name, $email, $phone, $role, $must_change, $id);
             } else {
                 $stmt = $conn->prepare("UPDATE users SET username=?, full_name=?, email=?, phone=?, role=? WHERE id=?");
                 $stmt->bind_param("sssssi", $username, $full_name, $email, $phone, $role, $id);
             }
             
-            if ($stmt->execute()) {
-                $message = 'User updated successfully!';
-            } else {
-                $error = 'Error updating user.';
+            if (!$error) {
+                if ($stmt->execute()) {
+                    $message = 'User updated successfully!' . (!empty($must_change) ? ' The user will be asked to choose a new password at next login.' : '');
+                } else {
+                    $error = 'Error updating user.';
+                }
             }
         }
     } elseif ($action === 'delete') {
@@ -100,14 +108,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Get users
-$users = $conn->query("SELECT * FROM users ORDER BY role, full_name ASC");
+$users = $conn->query("SELECT id, username, full_name, email, phone, role, must_change_password, created_at FROM users ORDER BY role, full_name ASC");
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Users - Sims-Tech Zambia</title>
+    <title>Users - <?php echo e(companyName()); ?></title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -171,9 +179,12 @@ $users = $conn->query("SELECT * FROM users ORDER BY role, full_name ASC");
                                             <td><?php echo htmlspecialchars($u['email'] ?? '-'); ?></td>
                                             <td><?php echo htmlspecialchars($u['phone'] ?? '-'); ?></td>
                                             <td>
-                                                <span class="badge badge-<?php echo $u['role'] === 'admin' ? 'success' : ($u['role'] === 'customer' ? 'warning' : 'info'); ?>">
-                                                    <?php echo ucfirst($u['role']); ?>
+                                                <span class="badge badge-<?php echo $u['role'] === 'admin' ? 'success' : ($u['role'] === 'customer' || $u['role'] === '' ? 'warning' : 'info'); ?>">
+                                                    <?php echo e($u['role'] === '' ? 'No role' : roleLabel($u['role'])); ?>
                                                 </span>
+                                                <?php if (!empty($u['must_change_password'])): ?>
+                                                    <div style="font-size: 0.75rem; color: #718096;"><i class="fas fa-key"></i> Must change password</div>
+                                                <?php endif; ?>
                                             </td>
                                             <td><?php echo date('M d, Y', strtotime($u['created_at'])); ?></td>
                                             <td>
@@ -232,25 +243,27 @@ $users = $conn->query("SELECT * FROM users ORDER BY role, full_name ASC");
                     </div>
                     
                     <div class="form-group" id="passwordGroup">
-                        <label>Password <span id="passwordHint">(leave blank to keep current)</span></label>
-                        <input type="password" name="password" id="password" class="form-control">
+                        <label><span id="passwordLabel">Default Password *</span> <span id="passwordHint" style="color: #718096; font-weight: normal;"></span></label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" name="password" id="password" class="form-control" minlength="8" autocomplete="new-password">
+                            <button type="button" class="btn btn-secondary" onclick="generatePassword()" title="Generate a strong password"><i class="fas fa-random"></i></button>
+                        </div>
                     </div>
                     
                     <div id="defaultPasswordInfo" style="display: none; background: #ebf8ff; border: 1px solid #90cdf4; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem;">
                         <p style="margin: 0; color: #2b6cb0; font-size: 0.9rem;">
-                            <i class="fas fa-info-circle"></i> Default password <strong>AC-techwork123</strong> will be set and sent to the user's email.
+                            <i class="fas fa-info-circle"></i> This password is emailed to the user. Internal users must choose their own password the first time they log in.
                         </p>
                     </div>
                     
                     <div class="form-group">
                         <label>Role *</label>
                         <select name="role" id="role" class="form-control" required>
-                            <option value="employee">Employee</option>
-                            <option value="technician">Technician</option>
-                            <option value="sales">Sales Person</option>
-                            <option value="admin">Admin</option>
-                            <option value="customer">Customer</option>
+                            <?php foreach (ROLE_LABELS as $role_value => $role_label): ?>
+                                <option value="<?php echo $role_value; ?>"><?php echo e($role_label); ?></option>
+                            <?php endforeach; ?>
                         </select>
+                        <div style="font-size: 0.8rem; color: #718096; margin-top: 4px;">Admin: full access incl. System Information and deleting repairs. Employee / Technician / Sales: inventory, POS, repairs and repair requests. Customer: shop and book repairs only.</div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -278,10 +291,14 @@ $users = $conn->query("SELECT * FROM users ORDER BY role, full_name ASC");
             document.getElementById('email').value = '';
             document.getElementById('email').required = true;
             document.getElementById('emailHint').style.display = '';
+            document.getElementById('phone').value = '';
             document.getElementById('password').value = '';
-            document.getElementById('password').required = false;
-            document.getElementById('passwordGroup').style.display = 'none';
+            document.getElementById('password').required = true;
+            document.getElementById('passwordLabel').textContent = 'Default Password *';
+            document.getElementById('passwordHint').textContent = '(min. 8 characters)';
+            document.getElementById('passwordGroup').style.display = 'block';
             document.getElementById('defaultPasswordInfo').style.display = 'block';
+            generatePassword();
             document.getElementById('role').value = 'employee';
             document.getElementById('userModal').classList.add('active');
         }
@@ -298,6 +315,7 @@ $users = $conn->query("SELECT * FROM users ORDER BY role, full_name ASC");
             document.getElementById('phone').value = user.phone || '';
             document.getElementById('password').value = '';
             document.getElementById('password').required = false;
+            document.getElementById('passwordLabel').textContent = 'Reset Password';
             document.getElementById('passwordHint').textContent = '(leave blank to keep current)';
             document.getElementById('passwordGroup').style.display = 'block';
             document.getElementById('defaultPasswordInfo').style.display = 'none';
@@ -307,6 +325,12 @@ $users = $conn->query("SELECT * FROM users ORDER BY role, full_name ASC");
         
         function closeModal() {
             document.getElementById('userModal').classList.remove('active');
+        }
+
+        function generatePassword() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789@#%';
+            const bytes = crypto.getRandomValues(new Uint32Array(12));
+            document.getElementById('password').value = Array.from(bytes, b => chars[b % chars.length]).join('');
         }
         
         function deleteUser(id, name) {

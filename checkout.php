@@ -1,6 +1,8 @@
 <?php
 require_once 'config/database.php';
 require_once 'config/session.php';
+require_once 'config/receipts.php';
+require_once 'config/alerts.php';
 requireLogin();
 
 if (!isCustomer()) {
@@ -52,12 +54,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order']) && !$e
         $error = 'Please choose a valid payment method.';
     } else {
         $invoice_number = generateInvoiceNumber($conn);
+        // "Pay on collection" orders are recorded as pending until staff mark them paid
+        $payment_status = $payment_method === 'cash' ? 'pending' : 'paid';
+        $account = $conn->query("SELECT email, phone FROM users WHERE id = " . (int)$user['id'])->fetch_assoc();
+        $customer_email = $account['email'] ?? '';
+        $customer_phone = $account['phone'] ?? '';
         $conn->begin_transaction();
 
         try {
-            $stmt = $conn->prepare("INSERT INTO sales (invoice_number, user_id, customer_name, customer_phone, total_amount, payment_method) VALUES (?, ?, ?, ?, ?, ?)");
-            $customer_phone = '';
-            $stmt->bind_param('sissds', $invoice_number, $user['id'], $user['full_name'], $customer_phone, $total_amount, $payment_method);
+            $stmt = $conn->prepare("INSERT INTO sales (invoice_number, user_id, customer_id, customer_name, customer_phone, customer_email, total_amount, payment_method, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param('siisssdss', $invoice_number, $user['id'], $user['id'], $user['full_name'], $customer_phone, $customer_email, $total_amount, $payment_method, $payment_status);
             $stmt->execute();
             $sale_id = $conn->insert_id;
 
@@ -85,6 +91,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order']) && !$e
             $conn->rollback();
             $error = 'Unable to place the order. Please try again.';
         }
+
+        if (!empty($order_number)) {
+            $receipt_id = $payment_status === 'paid' ? issueReceipt($conn, 'sale', $sale_id) : null;
+            checkLowStock($conn, array_column($products, 'id'));
+        }
     }
 }
 ?>
@@ -93,7 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order']) && !$e
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Checkout - Sims-Tech Zambia</title>
+    <title>Checkout - <?php echo e(companyName()); ?></title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -103,7 +114,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order']) && !$e
         <?php if ($order_number ?? false): ?>
             <div class="alert alert-success">
                 <i class="fas fa-check-circle"></i> Your order has been placed. Order number: <strong><?php echo htmlspecialchars($order_number); ?></strong>
+                <?php if (!empty($receipt_id)): ?>
+                    <br>Your payment receipt has been emailed to you.
+                <?php else: ?>
+                    <br>Please pay when you collect your order. Your receipt will be emailed once payment is received.
+                <?php endif; ?>
             </div>
+            <?php if (!empty($receipt_id)): ?>
+                <a href="receipt.php?id=<?php echo (int)$receipt_id; ?>" class="btn btn-success"><i class="fas fa-receipt"></i> View / Print Receipt</a>
+            <?php endif; ?>
             <a href="customer_dashboard.php" class="btn btn-primary">Return to Dashboard</a>
         <?php else: ?>
             <?php if ($error): ?><div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>

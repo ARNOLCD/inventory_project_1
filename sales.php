@@ -1,11 +1,31 @@
 <?php
 require_once 'config/database.php';
 require_once 'config/session.php';
+require_once 'config/receipts.php';
 requireStaff();
 
 $user = getCurrentUser();
 $message = '';
 $error = '';
+
+// Pay-on-collection online orders: staff mark them paid, which issues and emails the receipt
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_paid'])) {
+    $sale_id = intval($_POST['sale_id']);
+    $payment_method = $_POST['payment_method'] ?? 'cash';
+    if (!isset(PAYMENT_METHODS[$payment_method])) {
+        $error = 'Please choose a valid payment method.';
+    } else {
+        $stmt = $conn->prepare("UPDATE sales SET payment_status = 'paid', payment_method = ? WHERE id = ? AND payment_status = 'pending'");
+        $stmt->bind_param("si", $payment_method, $sale_id);
+        $stmt->execute();
+        if ($stmt->affected_rows === 1) {
+            $receipt_id = issueReceipt($conn, 'sale', $sale_id);
+            $message = 'Payment recorded and receipt issued. <a href="receipt.php?id=' . (int)$receipt_id . '&print=1" target="_blank"><strong>Print receipt</strong></a>';
+        } else {
+            $error = 'This order is already marked as paid.';
+        }
+    }
+}
 
 // Handle clear sales history
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['clear_sales'])) {
@@ -63,6 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['clear_sales'])) {
                         }
                         
                         // Delete sale items then sales
+                        $conn->query("DELETE FROM documents WHERE source_type = 'sale' AND source_id IN ($ids_str)");
                         $conn->query("DELETE FROM sale_items WHERE sale_id IN ($ids_str)");
                         $conn->query("DELETE FROM sales WHERE id IN ($ids_str)");
                         
@@ -99,7 +120,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_sale'])) {
                 }
             }
             
-            // Delete sale items
+            // Delete sale items (and the automatic receipt for this sale)
+            $conn->query("DELETE FROM documents WHERE source_type = 'sale' AND source_id = $sale_id");
             $conn->query("DELETE FROM sale_items WHERE sale_id = $sale_id");
             
             // Delete sale record
@@ -118,6 +140,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_sale'])) {
 // Get filter parameters
 $date_from = $_GET['date_from'] ?? date('Y-m-01');
 $date_to = $_GET['date_to'] ?? date('Y-m-d');
+$is_date = fn($d) => (bool)preg_match('/^\d{4}-\d{2}-\d{2}$/', $d);
+$date_from = $is_date($date_from) ? $date_from : date('Y-m-01');
+$date_to = $is_date($date_to) ? $date_to : date('Y-m-d');
 $employee_filter = $_GET['employee'] ?? '';
 
 // Build query
@@ -137,7 +162,7 @@ $sales = $conn->query("
 ");
 
 // Get totals
-$totals = $conn->query("SELECT COALESCE(SUM(total_amount), 0) as total, COUNT(*) as count FROM sales s $where")->fetch_assoc();
+$totals = $conn->query("SELECT COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN total_amount END), 0) as total, COUNT(*) as count FROM sales s $where")->fetch_assoc();
 
 // Get employees for filter
 $employees = $conn->query("SELECT id, full_name FROM users ORDER BY full_name ASC");
@@ -147,7 +172,7 @@ $employees = $conn->query("SELECT id, full_name FROM users ORDER BY full_name AS
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sales History - Sims-Tech Zambia</title>
+    <title>Sales History - <?php echo e(companyName()); ?></title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -270,12 +295,31 @@ $employees = $conn->query("SELECT id, full_name FROM users ORDER BY full_name AS
                                                 <td><?php echo htmlspecialchars($sale['employee_name']); ?></td>
                                                 <td><span class="badge badge-info"><?php echo $sale['item_count']; ?> items</span></td>
                                                 <td><strong>K<?php echo number_format($sale['total_amount'], 2); ?></strong></td>
-                                                <td><span class="badge badge-success"><?php echo ucfirst(str_replace('_', ' ', $sale['payment_method'])); ?></span></td>
+                                                <td>
+                                                    <?php if (($sale['payment_status'] ?? 'paid') === 'pending'): ?>
+                                                        <span class="badge badge-warning">Unpaid - pay on collection</span>
+                                                    <?php else: ?>
+                                                        <span class="badge badge-success"><?php echo e(paymentMethodLabel($sale['payment_method'])); ?></span>
+                                                    <?php endif; ?>
+                                                </td>
                                                 <td><?php echo date('M d, Y H:i', strtotime($sale['sale_date'])); ?></td>
                                                 <td>
                                                     <button class="action-btn view" onclick="viewSale(<?php echo $sale['id']; ?>)" title="View Details">
                                                         <i class="fas fa-eye"></i>
                                                     </button>
+                                                    <?php if (($sale['payment_status'] ?? 'paid') === 'pending'): ?>
+                                                        <form method="POST" style="display: inline;" onsubmit="return confirm('Record payment for <?php echo e($sale['invoice_number']); ?> and email the receipt?');">
+                                                            <input type="hidden" name="sale_id" value="<?php echo $sale['id']; ?>">
+                                                            <select name="payment_method" style="padding: 3px; font-size: 0.8rem;">
+                                                                <?php foreach (PAYMENT_METHODS as $method => $label): ?>
+                                                                    <option value="<?php echo $method; ?>"><?php echo e($label); ?></option>
+                                                                <?php endforeach; ?>
+                                                            </select>
+                                                            <button type="submit" name="mark_paid" value="1" class="action-btn" style="background: #38a169; color: #fff;" title="Mark paid &amp; issue receipt"><i class="fas fa-check"></i></button>
+                                                        </form>
+                                                    <?php else: ?>
+                                                        <a class="action-btn" href="receipt.php?source=sale&amp;id=<?php echo $sale['id']; ?>" target="_blank" title="View / print receipt" style="background: #38a169; color: #fff;"><i class="fas fa-receipt"></i></a>
+                                                    <?php endif; ?>
                                                     <?php if (isAdmin()): ?>
                                                     <button class="action-btn delete" onclick="deleteSale(<?php echo $sale['id']; ?>, '<?php echo htmlspecialchars($sale['invoice_number']); ?>')" title="Delete Transaction">
                                                         <i class="fas fa-trash"></i>
@@ -407,7 +451,7 @@ $employees = $conn->query("SELECT id, full_name FROM users ORDER BY full_name AS
                 </head>
                 <body>
                     <div class="company-info">
-                        <h2>Sims-Tech Zambia</h2>
+                        <h2><?php echo e(companyName()); ?></h2>
                         <p>Your Trusted Technology Partner</p>
                     </div>
                     ${content}

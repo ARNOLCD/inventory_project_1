@@ -16,11 +16,6 @@ if (isLoggedIn()) {
 $error = '';
 $success = '';
 
-// Add phone column to users table if not exists
-$conn->query("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20) AFTER email");
-
-ensureUserRoles($conn);
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $full_name = trim($_POST['full_name'] ?? '');
     $username = trim($_POST['username'] ?? '');
@@ -69,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     // Send welcome email
                     $loginLink = SYSTEM_URL . "/login.php";
-                    $subject = "Welcome to Sims-Tech Zambia - Customer Account Created";
+                    $subject = "Welcome to " . companyName() . " - Customer Account Created";
                     
                     $body = "
                     <html>
@@ -86,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <body>
                         <div class='container'>
                             <div class='header'>
-                                <h1>Sims-Tech Zambia</h1>
+                                <h1>" . e(companyName()) . "</h1>
                                 <p>Customer Account Created</p>
                             </div>
                             <div class='content'>
@@ -104,7 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <p>If you have any questions, please contact us.</p>
                             </div>
                             <div class='footer'>
-                                <p>&copy; " . date('Y') . " Sims-Tech Zambia. All rights reserved.</p>
+                                <p>&copy; " . date('Y') . " " . e(companyName()) . ". All rights reserved.</p>
                             </div>
                         </div>
                     </body>
@@ -124,7 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Create Account - Sims-Tech Zambia</title>
+    <title>Create Account - <?php echo e(companyName()); ?></title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -356,7 +351,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="auth-container">
         <div class="auth-card">
             <div class="auth-header">
-                <img src="assets/images/sims-tech-logo.jpg" alt="Sims-Tech Zambia Logo" onerror="this.style.display='none'">
+                <img src="<?php echo e(companyLogo()); ?>" alt="<?php echo e(companyName()); ?> Logo" onerror="this.style.display='none'">
                 <h1>Create Your Account</h1>
                 <p>Sign up to shop products, book repairs, and track your orders</p>
             </div>

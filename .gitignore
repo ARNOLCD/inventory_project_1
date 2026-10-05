@@ -1,0 +1,5 @@
+# Runtime data - may contain customer data, emails and password hashes
+logs/*.log
+backups/*.sql
+uploads/repairs/*
+!uploads/repairs/.gitkeep

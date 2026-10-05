@@ -17,6 +17,8 @@ $customer_allowed_pages = [
     'repair_payment.php',       // Pay for own repairs
     'products.php',             // Online shop (customer view only)
     'checkout.php',             // Complete online purchase
+    'receipt.php',              // View/print own payment receipts
+    'change_password.php',
     'login.php',
     'logout.php',
     'signup.php',
@@ -26,6 +28,16 @@ $customer_allowed_pages = [
 ];
 
 $current_page = basename($_SERVER['PHP_SELF']);
+
+// Users created by an admin must choose their own password before using the system
+if (!empty($_SESSION['user_id']) && !empty($_SESSION['must_change_password']) && !in_array($current_page, ['change_password.php', 'logout.php'], true)) {
+    if (basename(dirname($_SERVER['PHP_SELF'])) === 'ajax') {
+        header('HTTP/1.0 403 Forbidden');
+        exit('Password change required');
+    }
+    header('Location: change_password.php');
+    exit();
+}
 
 $is_staff_role = isset($_SESSION['role']) && in_array($_SESSION['role'], STAFF_ROLES, true);
 

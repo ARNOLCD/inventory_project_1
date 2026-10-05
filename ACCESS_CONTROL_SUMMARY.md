@@ -8,6 +8,8 @@
 - `repair_payment.php` - Pay for completed repairs
 - `products.php` - Browse and purchase products (customer view only)
 - `checkout.php` - Complete product purchases
+- `receipt.php` - View/print **their own** payment receipts only
+- `change_password.php` - Change own password
 - `login.php` - Authentication
 - `signup.php` - Create customer account
 - `logout.php` - Logout
@@ -37,14 +39,17 @@
 
 ## Staff/Admin User Access Rights
 
+Internal roles: **Admin, Employee, Technician, Sales Person** (`STAFF_ROLES` in `config/session.php`).
+
 ### ✅ **Staff/Admin Users CAN Access:**
 - All inventory management pages
 - Dashboard, products, categories, services
-- POS, sales, reports
-- Repair management
+- POS, sales, reports, receipts (record payments, print/resend receipts)
+- Repair management, repair requests (accept/deny)
 - Document management
-- User management (admin only)
-- Settings and backups (admin only)
+- User management (admin only) - admin sets each user's default password and role; internal users must change it at first login
+- System Information, backups (admin only)
+- Deleting repair tickets (admin only)
 
 ### ❌ **Staff/Admin Users CANNOT Access:**
 - `customer_dashboard.php` - Customer-specific dashboard
@@ -56,10 +61,12 @@
 
 ### 1. **Session-Based Access Control** (`config/session.php`)
 - `requireLogin()` - Ensures user is authenticated
-- `requireStaff()` - Restricts to admin/employee roles only
+- `requireStaff()` - Restricts to internal roles (admin, employee, technician, sales)
 - `requireAdmin()` - Restricts to admin role only
-- `isCustomer()` - Checks if user has customer role
-- `isStaff()` - Checks if user has admin or employee role
+- `isCustomer()` - Fail-closed: any logged-in user without a staff role is treated as a customer
+- `isStaff()` - Checks for an internal staff role
+- Users flagged `must_change_password` can only reach `change_password.php` / `logout.php` until they set their own password
+- Password reset requires the emailed, single-use, 1-hour token (tokens are stored hashed)
 
 ### 2. **Additional URL-Based Blocking** (`config/access_control.php`)
 - Customers use an **allowlist**: only the pages listed under "Customer Users CAN Access" are permitted; every other page (including new pages added later) redirects to `customer_dashboard.php`, and AJAX endpoints return 403
@@ -97,6 +104,26 @@
 - Customer ID (from user account)
 - Ticket Number (auto-generated)
 - Status (auto-set to 'booked')
+
+## System Information (admin)
+
+`settings.php` (sidebar: System Information) - tabs for Company & Location, About, Contact Details, Logo & Branding, Banking, Services, Email (SMTP + "send from" address, test email, queue stats), Alerts, System. Values are stored in `company_info` / `system_settings` and used across the website, sidebar, receipts and emails. SMTP credentials are stored only in the database.
+
+## Receipts
+
+Every completed payment automatically creates one receipt (`documents`, type `receipt`) and emails it to the client:
+- Online checkout paid by card/mobile money (pay-on-collection orders get a receipt when staff mark them paid in Sales History)
+- Customer repair payments, and staff **Record Payment** on Repair Tracking
+- POS sales (emailed if a customer email is entered)
+
+Receipts are printable at `receipt.php`; customers see theirs under **My Receipts** on their dashboard.
+
+## Notifications & Alerts
+
+- Header bell for internal users: pending repair requests + low-stock products
+- Low-stock email to all internal users when a product reaches its minimum level (once per product until restocked)
+- New repair request email to all internal users
+- All emails are queued (`email_queue`) and sent after the page is delivered; failures retry up to 3 times
 
 ## Repair Status Email Notifications
 
