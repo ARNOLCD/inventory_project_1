@@ -94,6 +94,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $error = 'Please choose a logo image to upload.';
         }
+    } elseif ($section === 'advert_video') {
+        $tab = 'branding';
+        $old_video = getSetting('advert_video');
+        if (!empty($_POST['remove_video'])) {
+            if (strpos($old_video, 'uploads/ads/') === 0 && is_file(__DIR__ . '/' . $old_video)) {
+                unlink(__DIR__ . '/' . $old_video);
+            }
+            saveSettings(['advert_video' => '']);
+            $message = 'Advert video removed from the homepage.';
+        } elseif (isset($_FILES['video']) && $_FILES['video']['error'] === UPLOAD_ERR_OK) {
+            $ext = strtolower(pathinfo($_FILES['video']['name'], PATHINFO_EXTENSION));
+            if (!in_array($ext, ['mp4', 'webm', 'ogg', 'mov'], true)) {
+                $error = 'Please upload an MP4, WEBM, OGG or MOV video.';
+            } else {
+                if (!is_dir(__DIR__ . '/uploads/ads')) {
+                    mkdir(__DIR__ . '/uploads/ads', 0777, true);
+                }
+                $file = 'uploads/ads/advert_' . time() . '.' . $ext;
+                if (move_uploaded_file($_FILES['video']['tmp_name'], __DIR__ . '/' . $file)) {
+                    if (strpos($old_video, 'uploads/ads/') === 0 && is_file(__DIR__ . '/' . $old_video)) {
+                        unlink(__DIR__ . '/' . $old_video);
+                    }
+                    saveSettings(['advert_video' => $file]);
+                    $message = 'Advert video uploaded. It is now shown on the homepage.';
+                } else {
+                    $error = 'Could not save the uploaded video.';
+                }
+            }
+        } elseif (isset($_FILES['video']) && $_FILES['video']['error'] === UPLOAD_ERR_INI_SIZE) {
+            $error = 'The video is bigger than the PHP upload limit (' . ini_get('upload_max_filesize') . '). Use a smaller file or paste a video link instead.';
+        } else {
+            $url = trim($_POST['video_url'] ?? '');
+            if ($url === '') {
+                $error = 'Please choose a video file or paste a video link (YouTube, Vimeo or direct URL).';
+            } elseif (!preg_match('~^https?://~i', $url)) {
+                $error = 'Please enter a valid video link starting with http:// or https://';
+            } else {
+                if (strpos($old_video, 'uploads/ads/') === 0 && is_file(__DIR__ . '/' . $old_video)) {
+                    unlink(__DIR__ . '/' . $old_video);
+                }
+                saveSettings(['advert_video' => $url]);
+                $message = 'Advert video link saved. It is now shown on the homepage.';
+            }
+        }
     } elseif (isset($company_fields[$section]) || isset($setting_fields[$section])) {
         if (isset($company_fields[$section])) {
             $values = [];
@@ -110,7 +154,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $settings['smtp_port'] = (string)(int)$settings['smtp_port'];
             $settings['smtp_encryption'] = in_array($settings['smtp_encryption'], ['tls', 'ssl', 'none'], true) ? $settings['smtp_encryption'] : 'tls';
             if (($_POST['smtp_password'] ?? '') !== '') {
-                $settings['smtp_password'] = $_POST['smtp_password'];
+                // Gmail shows app passwords with spaces ("xxxx xxxx xxxx xxxx") - store without them
+                $settings['smtp_password'] = preg_replace('/\s+/', '', $_POST['smtp_password']);
             }
         }
         if ($section === 'alerts') {
@@ -274,6 +319,39 @@ $field = fn($name) => e($company[$name] ?? '');
                             <button type="submit" class="btn btn-primary"><i class="fas fa-upload"></i> Upload Logo</button>
                             <?php if (!empty($company['logo'])): ?>
                                 <button type="submit" name="remove_logo" value="1" class="btn btn-secondary" formnovalidate onclick="return confirm('Remove the custom logo and use the default?')"><i class="fas fa-undo"></i> Use Default Logo</button>
+                            <?php endif; ?>
+                        </form>
+
+                        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;">
+                        <h4 style="margin: 0 0 5px;"><i class="fas fa-video"></i> Homepage Advert Video</h4>
+                        <p class="hint" style="margin-bottom: 15px;">Shown in a video section on the public homepage — advertise products and services.</p>
+                        <?php [$advert_type, $advert_src] = advertVideo(); ?>
+                        <?php if ($advert_src): ?>
+                            <div style="margin-bottom: 15px;">
+                                <?php if ($advert_type === 'file'): ?>
+                                    <video src="<?php echo e($advert_src); ?>" controls style="max-width: 100%; max-height: 220px; border-radius: 8px; background: #000;"></video>
+                                <?php else: ?>
+                                    <div style="position: relative; padding-top: 56.25%; max-width: 380px;">
+                                        <iframe src="<?php echo e($advert_src); ?>" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; border-radius: 8px;" allowfullscreen></iframe>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
+                        <form method="POST" action="settings.php?tab=branding" enctype="multipart/form-data">
+                            <input type="hidden" name="section" value="advert_video">
+                            <div class="form-group">
+                                <label>Upload Video</label>
+                                <input type="file" name="video" class="form-control" accept="video/mp4,video/webm,video/ogg,video/quicktime">
+                                <div class="hint">MP4, WEBM, OGG or MOV. PHP allows uploads up to <?php echo e(ini_get('upload_max_filesize')); ?> on this server.</div>
+                            </div>
+                            <div class="form-group">
+                                <label>Or paste a video link</label>
+                                <input type="url" name="video_url" class="form-control" placeholder="https://www.youtube.com/watch?v=... (YouTube, Vimeo or direct file URL)">
+                                <div class="hint">Best option for large videos: upload to YouTube and paste the link here.</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Video</button>
+                            <?php if ($advert_src): ?>
+                                <button type="submit" name="remove_video" value="1" class="btn btn-secondary" formnovalidate onclick="return confirm('Remove the advert video from the homepage?')"><i class="fas fa-trash"></i> Remove Video</button>
                             <?php endif; ?>
                         </form>
 

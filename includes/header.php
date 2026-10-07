@@ -6,6 +6,7 @@ if (isStaff()) {
     require_once __DIR__ . '/../config/alerts.php';
     $staff_notifications = $staff_notifications ?? getStaffNotifications($conn);
 }
+echo idleLogoutScript();
 ?>
 <header class="top-header">
     <div class="search-box">

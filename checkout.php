@@ -110,7 +110,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order']) && !$e
 </head>
 <body>
     <div class="customer-container" style="max-width: 800px; margin: 40px auto; padding: 30px;">
-        <h1><i class="fas fa-shopping-bag"></i> Checkout</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <h1 style="margin: 0;"><i class="fas fa-shopping-bag"></i> Checkout</h1>
+            <div>
+                <a href="customer_dashboard.php" class="btn btn-secondary"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                <a href="logout.php" class="btn btn-secondary"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            </div>
+        </div>
         <?php if ($order_number ?? false): ?>
             <div class="alert alert-success">
                 <i class="fas fa-check-circle"></i> Your order has been placed. Order number: <strong><?php echo htmlspecialchars($order_number); ?></strong>
@@ -151,5 +157,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order']) && !$e
         <?php endif; ?>
     </div>
     <?php if ($order_number ?? false): ?><script>localStorage.removeItem('customer_cart');</script><?php endif; ?>
+    <?php echo customerLogoutFooter(); ?>
+    <?php echo idleLogoutScript(); ?>
 </body>
 </html>

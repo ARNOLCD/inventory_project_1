@@ -59,140 +59,10 @@ $created = isset($_GET['created']);
             overflow: hidden;
         }
         
-        .doc-header-wave {
-            background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 50%, #3182ce 100%);
-            padding: 20px 30px;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .doc-header-wave::after {
-            content: '';
-            position: absolute;
-            bottom: -20px;
-            left: 0;
-            right: 0;
-            height: 40px;
-            background: white;
-            border-radius: 50% 50% 0 0 / 100% 100% 0 0;
-        }
-        
-        .doc-header-content {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 20px;
-            position: relative;
-            z-index: 1;
-        }
-        
-        .doc-logo {
-            background: white;
-            padding: 10px;
-            border-radius: 8px;
-            flex-shrink: 0;
-        }
-        
-        .doc-logo img {
-            height: 70px;
-            width: auto;
-            display: block;
-        }
-        
-        .doc-logo-text {
-            font-size: 2rem;
-            font-weight: 800;
-            color: #1e3a5f;
-            line-height: 1;
-        }
-        
-        .doc-logo-text span {
-            color: #e53e3e;
-        }
-        
-        .doc-company-title {
-            color: white;
-        }
-        
-        .doc-company-title h1 {
-            font-size: 1.8rem;
-            font-weight: 700;
-            margin: 0;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
-        }
-        
-        .doc-company-title p {
-            font-size: 0.75rem;
-            margin: 5px 0 0 0;
-            opacity: 0.9;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        
         .doc-body {
             padding: 30px;
         }
-        
-        .contact-info {
-            font-size: 0.85rem;
-            margin-bottom: 15px;
-            line-height: 1.6;
-        }
-        
-        .contact-info p {
-            margin: 3px 0;
-        }
-        
-        .contact-info strong {
-            color: #1e3a5f;
-        }
-        
-        .contact-info a {
-            color: #3182ce;
-            text-decoration: none;
-        }
-        
-        .brand-logos {
-            display: flex;
-            justify-content: flex-start;
-            gap: 25px;
-            margin: 15px 0 20px 0;
-            padding: 12px 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
-        }
-        
-        .brand-logo {
-            font-weight: 700;
-            font-size: 1.1rem;
-        }
-        
-        .brand-hp { color: #0096D6; font-style: italic; }
-        .brand-lenovo { color: #E2231A; }
-        .brand-dell { color: #007DB8; font-weight: 800; }
-        .brand-acer { color: #83B81A; }
-        
-        .doc-type-header {
-            text-align: center;
-            margin: 20px 0;
-            padding: 10px 0;
-            border-top: 2px solid #e2e8f0;
-            border-bottom: 2px solid #e2e8f0;
-        }
-        
-        .doc-type-header h2 {
-            margin: 0;
-            font-size: 1.3rem;
-            color: #e53e3e;
-            font-weight: 600;
-        }
-        
-        .doc-type-header span {
-            color: #1e3a5f;
-            font-size: 0.9rem;
-        }
-        
+
         .info-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -515,43 +385,23 @@ $created = isset($_GET['created']);
                 
                 <!-- Document Preview -->
                 <div class="document-preview" id="documentContent">
-                    <!-- Blue Wave Header -->
-                    <div class="doc-header-wave">
-                        <div class="doc-header-content">
-                            <div class="doc-company-title">
-                                <h1><?php echo e(companyName()); ?></h1>
-                                <p>SAVINGS THROUGH MAINTENANCE OF YOUR COMPUTERS</p>
-                            </div>
-                            <div class="doc-logo">
-                                <img src="<?php echo e(companyLogo()); ?>" alt="<?php echo e(companyName()); ?> Logo" onerror="this.parentElement.innerHTML='<div class=\'doc-logo-text\'>AC<span>TECH</span></div>'">
-                            </div>
-                        </div>
-                    </div>
-                    
+                    <!-- Branded banner: logo card left, company name + tagline right -->
+                    <?php echo documentBanner(); ?>
+
                     <!-- Document Body -->
                     <div class="doc-body">
                         <!-- Contact Information -->
-                        <div class="contact-info">
-                            <p><strong>UNZA MAIN CAMPUS.</strong> &nbsp;&nbsp;&nbsp; EMAIL: <a href="mailto:<?php echo htmlspecialchars($company['email'] ?? 'info@actechnology.co.zm'); ?>"><?php echo htmlspecialchars($company['email'] ?? 'info@actechnology.co.zm'); ?></a>, TPIN #:<?php echo htmlspecialchars($company['tpin'] ?? '2002530937'); ?></p>
-                            <p><strong>NEXT TO THE POST OFFICE.</strong> &nbsp;&nbsp;&nbsp; Mobile: <?php echo htmlspecialchars($company['phone'] ?? '0979145428'); ?>, <?php echo htmlspecialchars($company['mobile'] ?? '0968745131'); ?></p>
-                            <p><?php echo htmlspecialchars($company['address'] ?? '+260974728675'); ?></p>
-                        </div>
-                        
-                                                
-                        <!-- Document Type Header -->
-                        <div class="doc-type-header">
-                            <h2><?php echo $type_titles[$document['document_type']]; ?> <span>No. <?php echo htmlspecialchars($document['document_number']); ?></span></h2>
-                        </div>
-                        
+                        <?php echo documentContactInfo(); ?>
+
+                        <?php echo documentBrands(); ?>
+
+                        <!-- Document Type Header (right-aligned, like the office template) -->
+                        <?php echo documentTitle($type_titles[$document['document_type']], $document['document_number']); ?>
+
                         <!-- Info Grid: Bank Details & Client Info -->
                         <div class="info-grid">
                             <div class="bank-section">
-                                <h4>BANK DETAILS</h4>
-                                <p><strong>BANK:</strong> <?php echo htmlspecialchars($company['bank_name'] ?? 'STANBIC'); ?></p>
-                                <p><strong>ACCOUNT NAME:</strong> <?php echo htmlspecialchars($company['account_name'] ?? companyName()); ?></p>
-                                <p><strong>Account No:</strong> <?php echo htmlspecialchars($company['account_number'] ?? '6292984114'); ?></p>
-                                <p><strong>BRANCH:</strong> <?php echo htmlspecialchars($company['branch'] ?? '260006'); ?></p>
-                                <p><strong>PAY TO SALE:</strong> <?php echo htmlspecialchars($company['pay_to_sale'] ?? '0973071800'); ?></p>
+                                <?php echo documentBankDetails(); ?>
                             </div>
                             <div class="client-section">
                                 <p><strong>DATE:</strong> <?php echo date('d/m/Y', strtotime($document['created_at'])); ?></p>
@@ -569,8 +419,8 @@ $created = isset($_GET['created']);
                         <table class="items-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 60px;">QTY</th>
                                     <th>DESCRIPTION</th>
+                                    <th style="width: 60px;" class="text-center">QTY</th>
                                     <th style="width: 120px;" class="text-right">UNIT PRICE</th>
                                     <th style="width: 120px;" class="text-right">TOTAL</th>
                                 </tr>
@@ -578,8 +428,8 @@ $created = isset($_GET['created']);
                             <tbody>
                                 <?php while ($item = $items->fetch_assoc()): ?>
                                     <tr>
-                                        <td class="text-center"><?php echo $item['quantity']; ?></td>
                                         <td><?php echo htmlspecialchars($item['description']); ?></td>
+                                        <td class="text-center"><?php echo $item['quantity']; ?></td>
                                         <td class="text-right">K<?php echo number_format($item['unit_price'], 2); ?></td>
                                         <td class="text-right">K<?php echo number_format($item['total_price'], 2); ?></td>
                                     </tr>
@@ -616,17 +466,16 @@ $created = isset($_GET['created']);
                         </table>
                         
                         <!-- Footer -->
-                        <div class="doc-footer">
+                        <div class="doc-footer" style="text-align: center;">
                             <p><strong><?php echo e(companyName()); ?></strong></p>
-                            
+
                             <?php if ($document['notes']): ?>
                                 <p style="margin-top: 15px;"><strong>Notes:</strong> <?php echo nl2br(htmlspecialchars($document['notes'])); ?></p>
                             <?php endif; ?>
-                            
-                            <div class="signature-area">
-                                <div class="signature-line">
-                                    Prepared by: ___________________________
-                                </div>
+
+                            <div class="signature-area" style="display: flex; justify-content: space-between;">
+                                <div class="signature-line">Prepared by: <?php echo htmlspecialchars($document['created_by'] ?? ''); ?></div>
+                                <div class="signature-line">SIGNATURE</div>
                             </div>
                         </div>
                     </div>

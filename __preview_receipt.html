@@ -1,0 +1,116 @@
+
+Notice: session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\inventory_project_1-main\config\session.php on line 2
+
+Warning: Undefined array key "REQUEST_METHOD" in C:\xampp\htdocs\inventory_project_1-main\receipt.php on line 29
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt REC-20261006-0002 - Sims-Tech Zambia</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: Arial, sans-serif; background: #edf2f7; color: #2d3748; margin: 0; padding: 30px 15px; }
+        .toolbar { max-width: 760px; margin: 0 auto 15px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .toolbar a, .toolbar button { background: #1a365d; color: #fff; border: none; padding: 10px 18px; border-radius: 6px; text-decoration: none; cursor: pointer; font-size: 14px; }
+        .toolbar .secondary { background: #718096; }
+        .notice { max-width: 760px; margin: 0 auto 15px; background: #f0fff4; border: 1px solid #9ae6b4; padding: 10px 15px; border-radius: 6px; }
+        .receipt { max-width: 760px; margin: 0 auto; background: #fff; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); position: relative; }
+        .meta { display: flex; justify-content: space-between; margin: 20px 0; gap: 20px; font-size: 13px; }
+        .meta h4 { margin: 0 0 6px; color: #718096; font-size: 12px; text-transform: uppercase; }
+        .meta p { margin: 2px 0; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th { background: #1a365d; color: #fff; padding: 10px; text-align: left; }
+        td { padding: 10px; border-bottom: 1px solid #e2e8f0; }
+        .num { text-align: right; }
+        .total td { font-size: 16px; font-weight: bold; border-bottom: none; }
+        .stamp { position: absolute; right: 50px; top: 190px; border: 4px solid #38a169; color: #38a169; font-size: 30px; font-weight: bold; padding: 6px 18px; transform: rotate(-12deg); border-radius: 8px; opacity: 0.6; }
+        .foot { margin-top: 30px; text-align: center; font-size: 12px; color: #718096; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+        @media print {
+            body { background: #fff; padding: 0; }
+            .toolbar, .notice { display: none; }
+            .receipt { box-shadow: none; border-radius: 0; padding: 20px; max-width: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <button onclick="window.print()"><i class="fas fa-print"></i> Print</button>
+        <a href="sales.php" class="secondary"><i class="fas fa-arrow-left"></i> Back</a>
+                    <form method="POST" style="margin: 0;"><button type="submit" name="resend" value="1" class="secondary"><i class="fas fa-envelope"></i> Email to client</button></form>
+            </div>
+    
+    <div class="receipt">
+        <div class="stamp">PAID</div>
+        
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
+        <tr>
+            <td bgcolor="#1a365d" style="background-color: #1a365d; background-image: linear-gradient(115deg, #1a365d 0%, #2456a0 55%, #3182ce 100%); padding: 22px 26px;">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                        <td valign="middle" width="170">
+                            <table cellpadding="0" cellspacing="0" border="0"><tr>
+                                <td bgcolor="#ffffff" style="background: #ffffff; border-radius: 12px; padding: 12px 18px;">
+                                    <img src="assets/images/sims-tech-logo.jpg" alt="Sims-Tech Zambia" style="display: block; height: 58px; max-width: 145px;">
+                                </td>
+                            </tr></table>
+                        </td>
+                        <td valign="middle" align="right" style="text-align: right; padding-left: 20px;">
+                            <div style="font-family: Arial, sans-serif; font-size: 23px; font-weight: bold; color: #ffffff; letter-spacing: 0.5px;">Sims-Tech Zambia</div>
+                            <div style="font-family: Arial, sans-serif; font-size: 9px; color: #cfe3f7; letter-spacing: 2px; margin-top: 6px; text-transform: uppercase;">SAVINGS THROUGH MAINTENANCE OF YOUR COMPUTERS</div>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+        
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, sans-serif; font-size: 11px; color: #2d3748; margin: 12px 0;">
+        <tr>
+            <td valign="top" width="55%"><div style="margin: 2px 0; font-weight: bold; text-transform: uppercase;">UNZA MAIN CAMPUS</div><div style="margin: 2px 0; font-weight: bold; text-transform: uppercase;">NEXT TO THE POST OFFICE</div></td>
+            <td valign="top" align="right" style="text-align: right;"><div style="margin: 2px 0;"><strong>EMAIL:</strong> info@actechnology.co.zm, simstechzambia@gmail.com</div><div style="margin: 2px 0;"><strong>TPIN #:</strong> 2002530937</div><div style="margin: 2px 0;"><strong>Mobile:</strong> 0979145428, 0968745131</div></td>
+        </tr>
+    </table>
+        <div style="text-align: center; margin: 12px 0;"><img src="assets/images/doc-brands.png" alt="hp Lenovo DELL acer Microsoft" style="height: 34px; max-width: 100%;"></div>
+        
+    <div style="text-align: right; margin: 12px 0;">
+        <span style="font-family: Arial, sans-serif; font-size: 22px; font-weight: bold; color: #1a365d; letter-spacing: 3px;">RECEIPT</span>
+        <span style="font-family: Arial, sans-serif; font-size: 13px; color: #4a5568; margin-left: 8px;">No. REC-20261006-0002</span>
+    </div>
+        <div class="meta">
+            <div>
+                <div style="color: #c53030; font-weight: bold; font-size: 11px; letter-spacing: 1px; margin-bottom: 6px;">BANK DETAILS</div><p style="margin: 3px 0;"><strong>BANK:</strong> STANBIC</p><p style="margin: 3px 0;"><strong>ACCOUNT NAME:</strong> Sims-Tech Zambia</p><p style="margin: 3px 0;"><strong>Account No:</strong> 6292984114</p><p style="margin: 3px 0;"><strong>BRANCH:</strong> 260006</p><p style="margin: 3px 0;"><strong>PAY TO SALE:</strong> 0973071800</p>            </div>
+            <div style="text-align: right;">
+                <p><strong>DATE:</strong> 06/10/2026</p>
+                <p><strong>CLIENT NAME:</strong> Arnold chama</p>
+                <p><strong>PHONE:</strong> 0968745131</p>                <p><strong>PAYMENT:</strong> Cash</p>
+                <p>Payment for order/invoice INV-20261006-0002</p>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr><th>Description</th><th class="num">Qty</th><th class="num">Unit Price</th><th class="num">Amount</th></tr>
+            </thead>
+            <tbody>
+                                    <tr>
+                        <td>Samsung</td>
+                        <td class="num">1</td>
+                        <td class="num">K4,500.00</td>
+                        <td class="num">K4,500.00</td>
+                    </tr>
+                                <tr class="total">
+                    <td colspan="3" class="num">Total Paid</td>
+                    <td class="num">K4,500.00</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="foot">
+            <p><strong>Sims-Tech Zambia</strong></p>
+            <p>Thank you for your business!</p>
+            <div style="margin-top: 40px; display: inline-block; width: 220px; border-top: 1px solid #333; padding-top: 5px; font-size: 12px;">SIGNATURE</div>
+        </div>
+    </div>
+    </body>
+</html>

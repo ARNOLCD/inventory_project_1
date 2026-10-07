@@ -1,10 +1,14 @@
 <?php
 require_once 'config/database.php';
+require_once 'config/session.php';
 
 // Get company info (managed under System Information)
 $company = companyInfo();
 $social_links = array_filter(['facebook-f' => $company['facebook'] ?? '', 'twitter' => $company['twitter'] ?? '', 'instagram' => $company['instagram'] ?? '']);
 $whatsapp = preg_replace('/[^0-9]/', '', getSetting('whatsapp'));
+
+// Homepage advert video (managed under System Information > Logo & Branding)
+[$advert_type, $advert_src] = advertVideo();
 
 // Get active services (managed in services.php)
 $services_result = $conn->query("SELECT * FROM services WHERE status = 'active' ORDER BY id ASC");
@@ -494,8 +498,13 @@ $categories_result = $conn->query("
                 <li><a href="#products" class="nav-red">Products</a></li>
                 <li><a href="#about" class="nav-red">About Us</a></li>
                 <li><a href="#contact" class="nav-red">Contact</a></li>
-                <li><a href="signup.php" class="nav-btn" style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);">Sign Up</a></li>
-                <li><a href="login.php" class="nav-btn">Login</a></li>
+                <?php if (isLoggedIn()): ?>
+                    <li><a href="<?php echo e(homePage()); ?>" class="nav-btn" style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);"><i class="fas fa-tachometer-alt"></i> My Dashboard</a></li>
+                    <li><a href="logout.php" class="nav-btn"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                <?php else: ?>
+                    <li><a href="signup.php" class="nav-btn" style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);">Sign Up</a></li>
+                    <li><a href="login.php" class="nav-btn">Login</a></li>
+                <?php endif; ?>
             </ul>
             <button class="mobile-menu-btn">
                 <i class="fas fa-bars"></i>
@@ -560,8 +569,13 @@ $categories_result = $conn->query("
             <div class="hero-buttons">
                 <a href="#products" class="btn btn-bright-orange"><i class="fas fa-shopping-cart"></i> Shop Now</a>
                 <a href="#services" class="btn btn-bright-green"><i class="fas fa-tools"></i> Our Services</a>
-                <a href="signup.php" class="btn btn-bright-yellow"><i class="fas fa-user-plus"></i> Sign Up</a>
-                <a href="login.php" class="btn btn-bright-yellow" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"><i class="fas fa-sign-in-alt"></i> Login</a>
+                <?php if (isLoggedIn()): ?>
+                    <a href="<?php echo e(homePage()); ?>" class="btn btn-bright-yellow"><i class="fas fa-tachometer-alt"></i> My Dashboard</a>
+                    <a href="logout.php" class="btn btn-bright-yellow" style="background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                <?php else: ?>
+                    <a href="signup.php" class="btn btn-bright-yellow"><i class="fas fa-user-plus"></i> Sign Up</a>
+                    <a href="login.php" class="btn btn-bright-yellow" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"><i class="fas fa-sign-in-alt"></i> Login</a>
+                <?php endif; ?>
             </div>
         </div>
         <div class="wave-divider">
@@ -628,6 +642,27 @@ $categories_result = $conn->query("
             </div>
         </div>
     </section>
+
+    <?php if ($advert_src): ?>
+    <!-- Advert Video Section -->
+    <section id="video" style="background: var(--light-bg); padding: 70px 0;">
+        <div class="container">
+            <div class="section-header" data-animate="fadeInUp">
+                <h2>Watch Our Video</h2>
+                <p>See what <?php echo e(companyName()); ?> has to offer</p>
+            </div>
+            <div style="max-width: 800px; margin: 0 auto;" data-animate="fadeInUp">
+                <?php if ($advert_type === 'file'): ?>
+                    <video src="<?php echo e($advert_src); ?>" controls preload="metadata" style="width: 100%; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); background: #000;"></video>
+                <?php else: ?>
+                    <div style="position: relative; padding-top: 56.25%; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+                        <iframe src="<?php echo e($advert_src); ?>" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </section>
+    <?php endif; ?>
 
     <!-- Features Section -->
     <section class="features-section">
@@ -933,5 +968,7 @@ $categories_result = $conn->query("
             });
         });
     </script>
+    <?php echo customerLogoutFooter(); ?>
+    <?php echo idleLogoutScript(); ?>
 </body>
 </html>

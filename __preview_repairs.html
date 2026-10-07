@@ -1,0 +1,932 @@
+
+Notice: session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\inventory_project_1-main\config\session.php on line 2
+
+Warning: Undefined array key "REQUEST_METHOD" in C:\xampp\htdocs\inventory_project_1-main\repairs.php on line 19
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Repair Tracking - Sims-Tech Zambia</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Poppins', sans-serif; }
+        .status-booked { background: #3182ce; color: white; }
+        .status-item_received { background: #4299e1; color: white; }
+        .status-in_progress { background: #dd6b20; color: white; }
+        .status-completed { background: #38a169; color: white; }
+        .status-in_transit { background: #9f7aea; color: white; }
+        .status-delivered { background: #805ad5; color: white; }
+        .status-cancelled { background: #e53e3e; color: white; }
+        .repair-categories { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 15px; }
+        .repair-category {
+            background: #fff;
+            border-radius: 12px;
+            padding: 18px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            text-decoration: none;
+            color: #2d3748;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .repair-category:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+        .repair-category.active { background: var(--cat-color); }
+        .repair-category .cat-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 12px;
+            background: var(--cat-color);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            flex-shrink: 0;
+        }
+        .repair-category.active .cat-icon { background: #fff; color: var(--cat-color); }
+        .repair-category .cat-info { display: flex; flex-direction: column; }
+        .repair-category strong { font-size: 1.6rem; line-height: 1.2; }
+        .repair-category span { font-size: 0.85rem; color: #718096; }
+        .repair-category.active strong { color: #fff; }
+        .repair-category.active span { color: rgba(255,255,255,0.9); }
+        .status-pending_approval { background: #718096; color: white; }
+        .status-rejected { background: #c53030; color: white; }
+        .priority-urgent { border-left: 4px solid #e53e3e; }
+        .priority-high { border-left: 4px solid #dd6b20; }
+        .priority-normal { border-left: 4px solid #3182ce; }
+        .priority-low { border-left: 4px solid #a0aec0; }
+        .repair-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .repair-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+        .repair-ticket {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1a365d;
+        }
+        .repair-device {
+            color: #4a5568;
+            font-size: 0.9rem;
+        }
+        .repair-customer {
+            font-weight: 500;
+        }
+        .repair-problem {
+            background: #f7fafc;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            margin: 10px 0;
+        }
+        .repair-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .status-btn {
+            padding: 8px 14px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .status-btn:hover { opacity: 0.8; transform: translateY(-1px); }
+        .status-btn i { font-size: 1rem; margin-right: 4px; }
+        .btn-receive { background: #4299e1; color: white; }
+        .btn-start { background: #dd6b20; color: white; }
+        .btn-complete { background: #38a169; color: white; }
+        .btn-transit { background: #9f7aea; color: white; }
+        .btn-deliver { background: #805ad5; color: white; }
+
+        /* Group headers that split the list by repair status */
+        .status-group-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 22px 0 12px;
+            font-size: 1.05rem;
+            font-weight: 600;
+        }
+        .status-group-header .status-group-count {
+            background: #edf2f7;
+            color: #4a5568;
+            border-radius: 12px;
+            padding: 2px 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        /* Per-repair workflow tracker: Received -> Working -> Done -> Transit -> Delivered */
+        .repair-steps { display: flex; align-items: flex-start; margin: 16px 0 6px; }
+        .repair-step { display: flex; flex-direction: column; align-items: center; width: 84px; text-align: center; }
+        .repair-step i {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            background: #edf2f7;
+            color: #cbd5e0;
+        }
+        .repair-step span { font-size: 0.75rem; color: #718096; margin-top: 5px; line-height: 1.1; font-weight: 500; }
+        .repair-step.done i { background: #c6f6d5; color: #276749; }
+        .repair-step.done span { color: #2f855a; }
+        .repair-step.current i { background: var(--step-color); color: #fff; box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--step-color); }
+        .repair-step.current span { color: var(--step-color); font-weight: 700; }
+        .step-line { flex: 1; height: 3px; background: #edf2f7; margin-top: 22px; border-radius: 2px; min-width: 12px; }
+        .step-line.done { background: #c6f6d5; }
+        .repair-badge { padding: 8px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="dashboard-wrapper">
+        <aside class="sidebar">
+    <div class="sidebar-header">
+        <img src="assets/images/sims-tech-logo.jpg" alt="Sims-Tech Zambia Logo" onerror="this.style.display='none'">
+        <h2>Sims-Tech Zambia</h2>
+    </div>
+    <nav class="sidebar-menu">
+                    <!-- Staff/Admin Menu -->
+            <a href="dashboard.php" class="">
+                <i class="fas fa-tachometer-alt"></i> Dashboard
+            </a>
+
+            <div class="menu-section">
+                <span class="menu-section-title">Inventory</span>
+            </div>
+            <a href="products.php" class="">
+                <i class="fas fa-box"></i> Products
+            </a>
+            <a href="categories.php" class="">
+                <i class="fas fa-tags"></i> Categories
+            </a>
+            <a href="services.php" class="">
+                <i class="fas fa-cogs"></i> Services
+            </a>
+
+            <div class="menu-section">
+                <span class="menu-section-title">Sales</span>
+            </div>
+            <a href="pos.php" class="">
+                <i class="fas fa-cash-register"></i> Point of Sale
+            </a>
+            <a href="sales.php" class="">
+                <i class="fas fa-receipt"></i> Sales History
+            </a>
+            <a href="reports.php" class="">
+                <i class="fas fa-chart-bar"></i> Reports
+            </a>
+
+            <div class="menu-section">
+                <span class="menu-section-title">Repairs</span>
+            </div>
+                        <a href="repair_requests.php" class="">
+                <i class="fas fa-inbox"></i> Repair Requests
+                            </a>
+            <a href="repairs.php" class="active">
+                <i class="fas fa-tools"></i> Repair Tracking
+            </a>
+            <a href="repair_solutions.php" class="">
+                <i class="fas fa-lightbulb"></i> Repair Solutions
+            </a>
+
+            <div class="menu-section">
+                <span class="menu-section-title">Documents</span>
+            </div>
+                        <a href="documents.php" class="">
+                <i class="fas fa-file-alt"></i> All Documents
+            </a>
+            <a href="documents.php?type=invoice" class="">
+                <i class="fas fa-file-invoice"></i> Invoices
+            </a>
+            <a href="documents.php?type=quotation" class="">
+                <i class="fas fa-file-invoice-dollar"></i> Quotations
+            </a>
+            <a href="documents.php?type=receipt" class="">
+                <i class="fas fa-receipt"></i> Receipts
+            </a>
+
+                        <div class="menu-section">
+                <span class="menu-section-title">Administration</span>
+            </div>
+            <a href="users.php" class="">
+                <i class="fas fa-users"></i> Users
+            </a>
+            <a href="settings.php" class="">
+                <i class="fas fa-sliders-h"></i> System Information
+            </a>
+            <a href="backup.php" class="">
+                <i class="fas fa-database"></i> Backup
+            </a>
+            
+            <div class="menu-section">
+                <span class="menu-section-title">Account</span>
+            </div>
+            <a href="logout.php">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+            </nav>
+</aside>
+        
+        <div class="main-content">
+            <script>(function(){if(window.__idleLogout)return;window.__idleLogout=1;var t;function go(){window.location.href='logout.php?idle=1';}function reset(){clearTimeout(t);t=setTimeout(go,300000);}['mousemove','mousedown','keydown','scroll','touchstart'].forEach(function(e){window.addEventListener(e,reset,{passive:true});});reset();})();</script><header class="top-header">
+    <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input type="text" placeholder="Search...">
+    </div>
+    <div class="header-actions">
+                <div class="notification-wrapper" style="position: relative;">
+            <button class="notification-btn" type="button" onclick="document.getElementById('notificationMenu').classList.toggle('open')" title="Notifications">
+                <i class="fas fa-bell"></i>
+                            </button>
+            <div id="notificationMenu" class="notification-menu">
+                <div class="notification-menu-header">
+                    <strong>Notifications</strong>
+                    <span>0 requests &middot; 0 low stock</span>
+                </div>
+                                    <div class="notification-empty"><i class="fas fa-check-circle"></i> You're all caught up</div>
+                            </div>
+        </div>
+                <div class="user-dropdown">
+            <div class="user-avatar">
+                A            </div>
+            <div class="user-info">
+                <h4>Admin</h4>
+                <span>Admin</span>
+            </div>
+            <a href="change_password.php" title="Change password" style="margin-left: 10px; color: #718096;"><i class="fas fa-key"></i></a>
+        </div>
+    </div>
+</header>
+<style>
+    .notification-menu { display: none; position: absolute; right: 0; top: 42px; width: 340px; background: #fff; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); z-index: 1000; overflow: hidden; }
+    .notification-menu.open { display: block; }
+    .notification-menu-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px solid #e2e8f0; font-size: 0.85rem; }
+    .notification-menu-header span { color: #718096; font-size: 0.75rem; }
+    .notification-item { display: flex; gap: 12px; padding: 10px 15px; border-bottom: 1px solid #f1f5f9; color: #2d3748; text-decoration: none; font-size: 0.85rem; }
+    .notification-item:hover { background: #f7fafc; }
+    .notification-item i { margin-top: 3px; }
+    .notification-item small { display: block; color: #a0aec0; font-size: 0.7rem; }
+    .notification-menu-footer { display: flex; justify-content: space-between; padding: 10px 15px; font-size: 0.8rem; }
+    .notification-empty { padding: 25px; text-align: center; color: #718096; font-size: 0.9rem; }
+</style>
+<script>
+    document.addEventListener('click', function (e) {
+        const menu = document.getElementById('notificationMenu');
+        if (menu && !e.target.closest('.notification-wrapper')) menu.classList.remove('open');
+    });
+</script>
+            
+            <div class="dashboard-content">
+                <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h1><i class="fas fa-tools"></i> Repair Tracking</h1>
+                        <p>Track repair status for laptops, phones, and other devices</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="openAddModal()">
+                        <i class="fas fa-plus"></i> New Repair Ticket
+                    </button>
+                </div>
+                
+                                                
+                <!-- Repair categories (click to filter) -->
+                <div class="repair-categories mb-4">
+                                                                    <a href="repair_requests.php"
+                           class="repair-category " style="--cat-color: #718096;">
+                            <div class="cat-icon"><i class="fas fa-hourglass-half"></i></div>
+                            <div class="cat-info">
+                                <strong>0</strong>
+                                <span>Pending Approval</span>
+                            </div>
+                        </a>
+                                                                    <a href="repairs.php?status=booked"
+                           class="repair-category " style="--cat-color: #3182ce;">
+                            <div class="cat-icon"><i class="fas fa-clipboard-list"></i></div>
+                            <div class="cat-info">
+                                <strong>1</strong>
+                                <span>Booked</span>
+                            </div>
+                        </a>
+                                                                    <a href="repairs.php?status=item_received"
+                           class="repair-category " style="--cat-color: #4299e1;">
+                            <div class="cat-icon"><i class="fas fa-box"></i></div>
+                            <div class="cat-info">
+                                <strong>0</strong>
+                                <span>Item Received</span>
+                            </div>
+                        </a>
+                                                                    <a href="repairs.php?status=in_progress"
+                           class="repair-category " style="--cat-color: #dd6b20;">
+                            <div class="cat-icon"><i class="fas fa-wrench"></i></div>
+                            <div class="cat-info">
+                                <strong>0</strong>
+                                <span>In Progress</span>
+                            </div>
+                        </a>
+                                                                    <a href="repairs.php?status=completed"
+                           class="repair-category " style="--cat-color: #38a169;">
+                            <div class="cat-icon"><i class="fas fa-check-circle"></i></div>
+                            <div class="cat-info">
+                                <strong>0</strong>
+                                <span>Completed</span>
+                            </div>
+                        </a>
+                                                                    <a href="repairs.php?status=in_transit"
+                           class="repair-category " style="--cat-color: #9f7aea;">
+                            <div class="cat-icon"><i class="fas fa-shipping-fast"></i></div>
+                            <div class="cat-info">
+                                <strong>0</strong>
+                                <span>In Transit</span>
+                            </div>
+                        </a>
+                                                                    <a href="repairs.php?status=delivered"
+                           class="repair-category " style="--cat-color: #805ad5;">
+                            <div class="cat-icon"><i class="fas fa-hand-holding"></i></div>
+                            <div class="cat-info">
+                                <strong>1</strong>
+                                <span>Delivered</span>
+                            </div>
+                        </a>
+                                                                    <a href="repairs.php?status=rejected"
+                           class="repair-category " style="--cat-color: #c53030;">
+                            <div class="cat-icon"><i class="fas fa-ban"></i></div>
+                            <div class="cat-info">
+                                <strong>0</strong>
+                                <span>Declined</span>
+                            </div>
+                        </a>
+                                                                    <a href="repairs.php?status=cancelled"
+                           class="repair-category " style="--cat-color: #e53e3e;">
+                            <div class="cat-icon"><i class="fas fa-times-circle"></i></div>
+                            <div class="cat-info">
+                                <strong>0</strong>
+                                <span>Cancelled</span>
+                            </div>
+                        </a>
+                                    </div>
+                
+                <!-- Filters -->
+                <div class="card mb-4">
+                    <div class="card-body" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
+                        <a href="repairs.php" class="btn btn-primary btn-sm">All active</a>
+                                                
+                        <div style="display: flex; align-items: center; gap: 8px; margin-left: 10px;">
+                            <label style="font-size: 0.9rem; color: #4a5568;"><i class="fas fa-user-cog"></i> Technician:</label>
+                            <select class="form-control" style="width: 180px; padding: 5px 10px; font-size: 0.85rem;" onchange="filterByTechnician(this.value)">
+                                <option value="">All Technicians</option>
+                                                                    <option value="2" >
+                                        Latham                                    </option>
+                                                                    <option value="12" >
+                                        Ngosa                                    </option>
+                                                                    <option value="1" >
+                                        System Administrator                                    </option>
+                                                            </select>
+                        </div>
+                        
+                        <span style="margin-left: auto;">
+                            <input type="text" id="searchInput" class="form-control" placeholder="Search..." style="width: 200px;" onkeyup="searchRepairs()">
+                        </span>
+                    </div>
+                </div>
+                
+                <!-- Repairs List (grouped by status: booked, received, in progress, completed, in transit, delivered) -->
+                <div id="repairsList">
+                                                                                                                                <div class="status-group-header" style="color: #3182ce;">
+                                    <i class="fas fa-clipboard-list"></i>
+                                    Booked                                    <span class="status-group-count">1</span>
+                                </div>
+                                                        <div class="repair-card priority-normal" data-search="rep202610060007 arnold chama 0 hp system administrator">
+                                <div class="repair-header">
+                                    <div>
+                                        <div class="repair-ticket">REP202610060007</div>
+                                        <div class="repair-device">
+                                            <i class="fas fa-desktop"></i>
+                                            0                                             - HP                                             ELITEBOOK                                        </div>
+                                                                                    <div style="margin-top: 8px; display: flex; align-items: center; gap: 6px;">
+                                                <i class="fas fa-user-cog" style="color: #3182ce; font-size: 0.85rem;"></i>
+                                                <span style="font-size: 0.85rem; color: #2c5282; font-weight: 500;">
+                                                    System Administrator                                                </span>
+                                            </div>
+                                                                            </div>
+                                    <div style="text-align: right;">
+                                                                                <span class="badge status-booked repair-badge">
+                                            <i class="fas fa-clipboard-list"></i> Booked                                        </span>
+                                        <div style="font-size: 0.8rem; color: #718096; margin-top: 5px;">
+                                            Oct 06, 2026                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="repair-customer">
+                                    <i class="fas fa-user"></i> Arnold chama                                                                    </div>
+                                
+                                                                
+                                <div class="repair-problem">
+                                    <strong>Problem:</strong> Not turnong on                                </div>
+                                
+                                
+                                <!-- Workflow tracker: symbols show the stage clearly without clicking anything -->
+                                                                <div class="repair-steps">
+                                                                            <div class="repair-step " style="--step-color: #4299e1;" title="Item Received">
+                                            <i class="fas fa-box"></i>
+                                            <span>Received</span>
+                                        </div>
+                                                                                    <div class="step-line "></div>
+                                                                                                                    <div class="repair-step " style="--step-color: #dd6b20;" title="In Progress">
+                                            <i class="fas fa-wrench"></i>
+                                            <span>Working</span>
+                                        </div>
+                                                                                    <div class="step-line "></div>
+                                                                                                                    <div class="repair-step " style="--step-color: #38a169;" title="Completed">
+                                            <i class="fas fa-check-circle"></i>
+                                            <span>Done</span>
+                                        </div>
+                                                                                    <div class="step-line "></div>
+                                                                                                                    <div class="repair-step " style="--step-color: #9f7aea;" title="In Transit">
+                                            <i class="fas fa-shipping-fast"></i>
+                                            <span>Transit</span>
+                                        </div>
+                                                                                    <div class="step-line "></div>
+                                                                                                                    <div class="repair-step " style="--step-color: #805ad5;" title="Delivered">
+                                            <i class="fas fa-hand-holding"></i>
+                                            <span>Delivered</span>
+                                        </div>
+                                                                                                            </div>
+
+                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                                    <div style="font-size: 0.85rem; color: #718096;">
+                                                                                    Est: K500.00                                                                                                                    </div>
+                                    
+                                                                            <div style="display: flex; align-items: center; gap: 8px; background: #ebf8ff; padding: 6px 12px; border-radius: 20px; border: 1px solid #bee3f8;">
+                                            <i class="fas fa-user-cog" style="color: #3182ce;"></i>
+                                            <span style="font-size: 0.85rem; color: #2c5282; font-weight: 500;">
+                                                Assigned: System Administrator                                            </span>
+                                        </div>
+                                                                        
+                                    <div class="repair-actions">
+                                                                                    <button class="status-btn btn-receive" title="Mark that the device has arrived at the workshop" onclick="updateStatus(7, 'item_received')">
+                                                <i class="fas fa-box"></i> Item Received
+                                            </button>
+                                        
+                                        
+                                        <button class="action-btn" onclick="viewSolutions(7)" title="View Solutions" style="background: #667eea;">
+                                            <i class="fas fa-lightbulb"></i>
+                                        </button>
+                                        <button class="action-btn edit" onclick='editRepair({&quot;id&quot;:&quot;7&quot;,&quot;ticket_number&quot;:&quot;REP202610060007&quot;,&quot;customer_name&quot;:&quot;Arnold chama&quot;,&quot;customer_phone&quot;:null,&quot;customer_email&quot;:null,&quot;customer_id&quot;:null,&quot;device_type&quot;:&quot;0&quot;,&quot;device_brand&quot;:&quot;HP&quot;,&quot;device_model&quot;:&quot;ELITEBOOK&quot;,&quot;serial_number&quot;:&quot;&quot;,&quot;item_photo&quot;:null,&quot;problem_description&quot;:&quot;Not turnong on&quot;,&quot;diagnosis&quot;:null,&quot;repair_notes&quot;:&quot;\n[2026-10-06 18:29] Request accepted - post through yango or bright to our office&quot;,&quot;estimated_cost&quot;:&quot;500.00&quot;,&quot;final_cost&quot;:null,&quot;payment_method&quot;:null,&quot;payment_status&quot;:&quot;pending&quot;,&quot;payment_date&quot;:null,&quot;status&quot;:&quot;booked&quot;,&quot;priority&quot;:&quot;normal&quot;,&quot;received_by&quot;:&quot;1&quot;,&quot;technician_id&quot;:&quot;1&quot;,&quot;received_date&quot;:&quot;2026-10-06 08:00:42&quot;,&quot;item_received_date&quot;:null,&quot;started_date&quot;:null,&quot;completed_date&quot;:null,&quot;in_transit_date&quot;:null,&quot;delivered_date&quot;:null,&quot;created_at&quot;:&quot;2026-10-06 08:00:42&quot;,&quot;updated_at&quot;:&quot;2026-10-06 09:29:22&quot;,&quot;rejection_reason&quot;:null,&quot;reviewed_by&quot;:&quot;1&quot;,&quot;reviewed_date&quot;:&quot;2026-10-06 09:29:22&quot;,&quot;received_by_name&quot;:&quot;System Administrator&quot;,&quot;technician_name&quot;:&quot;System Administrator&quot;,&quot;customer_full_name&quot;:null})' title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                                                                <button class="action-btn delete" onclick="deleteRepair(7, 'REP202610060007')" title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                                                            </div>
+                                </div>
+                            </div>
+                                                                                    <div class="status-group-header" style="color: #805ad5;">
+                                    <i class="fas fa-hand-holding"></i>
+                                    Delivered                                    <span class="status-group-count">1</span>
+                                </div>
+                                                        <div class="repair-card priority-normal" data-search="rep202610050006 arnold chama laptop hp latham">
+                                <div class="repair-header">
+                                    <div>
+                                        <div class="repair-ticket">REP202610050006</div>
+                                        <div class="repair-device">
+                                            <i class="fas fa-laptop"></i>
+                                            laptop                                             - hp                                             dellxps 70                                        </div>
+                                                                                    <div style="margin-top: 8px; display: flex; align-items: center; gap: 6px;">
+                                                <i class="fas fa-user-cog" style="color: #3182ce; font-size: 0.85rem;"></i>
+                                                <span style="font-size: 0.85rem; color: #2c5282; font-weight: 500;">
+                                                    Latham                                                </span>
+                                            </div>
+                                                                            </div>
+                                    <div style="text-align: right;">
+                                                                                <span class="badge status-delivered repair-badge">
+                                            <i class="fas fa-hand-holding"></i> Delivered                                        </span>
+                                        <div style="font-size: 0.8rem; color: #718096; margin-top: 5px;">
+                                            Oct 04, 2026                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="repair-customer">
+                                    <i class="fas fa-user"></i> Arnold chama                                                                    </div>
+                                
+                                                                
+                                <div class="repair-problem">
+                                    <strong>Problem:</strong> deadset                                </div>
+                                
+                                
+                                <!-- Workflow tracker: symbols show the stage clearly without clicking anything -->
+                                                                <div class="repair-steps">
+                                                                            <div class="repair-step done" style="--step-color: #4299e1;" title="Item Received">
+                                            <i class="fas fa-box"></i>
+                                            <span>Received</span>
+                                        </div>
+                                                                                    <div class="step-line done"></div>
+                                                                                                                    <div class="repair-step done" style="--step-color: #dd6b20;" title="In Progress">
+                                            <i class="fas fa-wrench"></i>
+                                            <span>Working</span>
+                                        </div>
+                                                                                    <div class="step-line done"></div>
+                                                                                                                    <div class="repair-step done" style="--step-color: #38a169;" title="Completed">
+                                            <i class="fas fa-check-circle"></i>
+                                            <span>Done</span>
+                                        </div>
+                                                                                    <div class="step-line done"></div>
+                                                                                                                    <div class="repair-step done" style="--step-color: #9f7aea;" title="In Transit">
+                                            <i class="fas fa-shipping-fast"></i>
+                                            <span>Transit</span>
+                                        </div>
+                                                                                    <div class="step-line done"></div>
+                                                                                                                    <div class="repair-step current" style="--step-color: #805ad5;" title="Delivered">
+                                            <i class="fas fa-hand-holding"></i>
+                                            <span>Delivered</span>
+                                        </div>
+                                                                                                            </div>
+
+                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                                    <div style="font-size: 0.85rem; color: #718096;">
+                                                                                    Est: K500.00                                                                                                                            | Final: <strong>K0.00</strong>
+                                                                                            <span class="badge" style="background: #dd6b20; color: #fff; margin-left: 6px;">Unpaid</span>
+                                                                                                                        </div>
+                                    
+                                                                            <div style="display: flex; align-items: center; gap: 8px; background: #ebf8ff; padding: 6px 12px; border-radius: 20px; border: 1px solid #bee3f8;">
+                                            <i class="fas fa-user-cog" style="color: #3182ce;"></i>
+                                            <span style="font-size: 0.85rem; color: #2c5282; font-weight: 500;">
+                                                Assigned: Latham                                            </span>
+                                        </div>
+                                                                        
+                                    <div class="repair-actions">
+                                        
+                                        
+                                        <button class="action-btn" onclick="viewSolutions(6)" title="View Solutions" style="background: #667eea;">
+                                            <i class="fas fa-lightbulb"></i>
+                                        </button>
+                                        <button class="action-btn edit" onclick='editRepair({&quot;id&quot;:&quot;6&quot;,&quot;ticket_number&quot;:&quot;REP202610050006&quot;,&quot;customer_name&quot;:&quot;Arnold chama&quot;,&quot;customer_phone&quot;:null,&quot;customer_email&quot;:null,&quot;customer_id&quot;:null,&quot;device_type&quot;:&quot;laptop&quot;,&quot;device_brand&quot;:&quot;hp&quot;,&quot;device_model&quot;:&quot;dellxps 70&quot;,&quot;serial_number&quot;:&quot;&quot;,&quot;item_photo&quot;:null,&quot;problem_description&quot;:&quot;deadset&quot;,&quot;diagnosis&quot;:&quot;&quot;,&quot;repair_notes&quot;:&quot;\n[2026-10-05 08:44] Request accepted - book yango to deliver item or come with it at our office\n[2026-10-05 08:46] Status: item_received - received\n[2026-10-05 08:46] Status: item_received - received\n[2026-10-05 09:07] Status: in_progress - we have started fixing\n[2026-10-05 09:10] Status: completed - we have repaired\n[2026-10-05 09:10] Status: completed - we have repaired\n[2026-10-05 09:10] Status: completed - we have repaired\n[2026-10-05 09:10] Status: completed - we have repaired\n[2026-10-05 09:10] Status: completed - we have repaired\n[2026-10-05 09:13] Status: completed - we have repaired\n[2026-10-05 09:39] Status: in_transit - item on yango\n[2026-10-05 09:39] Status: in_transit - item on yango\n[2026-10-05 09:39] Status: in_transit - item on yango\n[2026-10-05 23:56] Status: in_transit - item on yango\n[2026-10-06 00:15] Status: delivered - item has been delivred to you&quot;,&quot;estimated_cost&quot;:&quot;500.00&quot;,&quot;final_cost&quot;:&quot;0.00&quot;,&quot;payment_method&quot;:null,&quot;payment_status&quot;:&quot;pending&quot;,&quot;payment_date&quot;:null,&quot;status&quot;:&quot;delivered&quot;,&quot;priority&quot;:&quot;normal&quot;,&quot;received_by&quot;:&quot;1&quot;,&quot;technician_id&quot;:&quot;2&quot;,&quot;received_date&quot;:&quot;2026-10-04 23:41:53&quot;,&quot;item_received_date&quot;:&quot;2026-10-04 23:46:48&quot;,&quot;started_date&quot;:&quot;2026-10-05 00:07:13&quot;,&quot;completed_date&quot;:&quot;2026-10-05 00:13:00&quot;,&quot;in_transit_date&quot;:&quot;2026-10-05 14:56:09&quot;,&quot;delivered_date&quot;:&quot;2026-10-05 15:15:36&quot;,&quot;created_at&quot;:&quot;2026-10-04 23:41:53&quot;,&quot;updated_at&quot;:&quot;2026-10-05 15:15:36&quot;,&quot;rejection_reason&quot;:null,&quot;reviewed_by&quot;:&quot;1&quot;,&quot;reviewed_date&quot;:&quot;2026-10-04 23:44:48&quot;,&quot;received_by_name&quot;:&quot;System Administrator&quot;,&quot;technician_name&quot;:&quot;Latham&quot;,&quot;customer_full_name&quot;:null})' title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                                                                <button class="action-btn delete" onclick="deleteRepair(6, 'REP202610050006')" title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                                                            </div>
+                                </div>
+                            </div>
+                                                            </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add/Edit Modal -->
+    <div class="modal-overlay" id="repairModal">
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 id="modalTitle"><i class="fas fa-tools"></i> New Repair Ticket</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <form method="POST" id="repairForm" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <input type="hidden" name="action" id="formAction" value="add">
+                    <input type="hidden" name="id" id="repairId">
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="form-group">
+                            <label>Customer Name *</label>
+                            <input type="text" name="customer_name" id="customerName" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Phone Number</label>
+                            <input type="text" name="customer_phone" id="customerPhone" class="form-control">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" name="customer_email" id="customerEmail" class="form-control">
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                        <div class="form-group">
+                            <label>Device Type *</label>
+                            <select name="device_type" id="deviceType" class="form-control" required>
+                                <option value="laptop">Laptop</option>
+                                <option value="phone">Phone</option>
+                                <option value="desktop">Desktop</option>
+                                <option value="tablet">Tablet</option>
+                                <option value="printer">Printer</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Brand</label>
+                            <input type="text" name="device_brand" id="deviceBrand" class="form-control" placeholder="e.g., HP, Dell, Samsung">
+                        </div>
+                        <div class="form-group">
+                            <label>Model</label>
+                            <input type="text" name="device_model" id="deviceModel" class="form-control">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Serial Number</label>
+                        <input type="text" name="serial_number" id="serialNumber" class="form-control">
+                    </div>
+                    
+                    <div class="form-group" id="customerGroup">
+                        <label><i class="fas fa-user"></i> Link to Customer Account (Optional)</label>
+                        <select name="customer_id" id="customerId" class="form-control">
+                            <option value="">-- No Customer Account --</option>
+                                                            <option value="13">
+                                    chama (1904948@northrise.net)
+                                </option>
+                                                    </select>
+                        <small style="color: #718096;">Link to existing customer account for email notifications</small>
+                    </div>
+                    
+                    <div class="form-group" id="technicianGroup">
+                        <label><i class="fas fa-user-cog"></i> Assigned Technician</label>
+                        <select name="technician_id" id="technicianId" class="form-control">
+                            <option value="">-- Select Technician --</option>
+                                                            <option value="2">Latham</option>
+                                                            <option value="12">Ngosa</option>
+                                                            <option value="1">System Administrator</option>
+                                                    </select>
+                        <small style="color: #718096;">Assign a technician to work on this repair</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-camera"></i> Item Photo</label>
+                        <div id="photoPreviewContainer" style="display: none; margin-bottom: 10px;">
+                            <img id="currentPhoto" src="" alt="Current Photo" style="max-width: 150px; max-height: 120px; border-radius: 8px; border: 2px solid #e2e8f0; object-fit: cover;">
+                            <div style="font-size: 0.75rem; color: #718096; margin-top: 3px;">Current photo</div>
+                        </div>
+                        <input type="file" name="item_photo" id="itemPhoto" class="form-control" accept="image/jpeg,image/png,image/gif,image/webp" onchange="previewPhoto(this)">
+                        <div id="photoPreview" style="display: none; margin-top: 8px;">
+                            <img id="photoPreviewImg" src="" alt="Preview" style="max-width: 150px; max-height: 120px; border-radius: 8px; border: 2px solid #90cdf4; object-fit: cover;">
+                        </div>
+                        <small style="color: #718096;">Accepted: JPG, PNG, GIF, WebP (Max 5MB)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Problem Description *</label>
+                        <textarea name="problem_description" id="problemDescription" class="form-control" rows="3" required placeholder="Describe the issue..."></textarea>
+                    </div>
+                    
+                    <div class="form-group" id="diagnosisGroup" style="display: none;">
+                        <label>Diagnosis</label>
+                        <textarea name="diagnosis" id="diagnosis" class="form-control" rows="2" placeholder="Technical diagnosis..."></textarea>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                        <div class="form-group">
+                            <label>Estimated Cost (K)</label>
+                            <input type="number" name="estimated_cost" id="estimatedCost" class="form-control" step="0.01" min="0">
+                        </div>
+                        <div class="form-group" id="finalCostGroup" style="display: none;">
+                            <label>Final Cost (K)</label>
+                            <input type="number" name="final_cost" id="finalCost" class="form-control" step="0.01" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Priority</label>
+                            <select name="priority" id="priority" class="form-control">
+                                <option value="low">Low</option>
+                                <option value="normal" selected>Normal</option>
+                                <option value="high">High</option>
+                                <option value="urgent">Urgent</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="submitBtn"><i class="fas fa-save"></i> Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Status Update Modal -->
+    <div class="modal-overlay" id="statusModal">
+        <div class="modal" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-sync"></i> Update Status</h3>
+                <button class="modal-close" onclick="closeStatusModal()">&times;</button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="update_status">
+                    <input type="hidden" name="id" id="statusRepairId">
+                    <input type="hidden" name="status" id="newStatus">
+                    
+                    <p id="statusMessage"></p>
+                    
+                    <div class="form-group">
+                        <label>Notes (optional)</label>
+                        <textarea name="notes" class="form-control" rows="2" placeholder="Add any notes..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeStatusModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Status</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Record Payment Modal -->
+    <div class="modal-overlay" id="paymentModal">
+        <div class="modal" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-cash-register"></i> Record Payment</h3>
+                <button class="modal-close" onclick="document.getElementById('paymentModal').classList.remove('active')">&times;</button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="record_payment">
+                    <input type="hidden" name="id" id="paymentRepairId">
+                    <p id="paymentMessage"></p>
+                    <div class="form-group">
+                        <label>Payment Method</label>
+                        <select name="payment_method" class="form-control" required>
+                                                            <option value="cash">Cash</option>
+                                                            <option value="card">Card</option>
+                                                            <option value="mobile_money">Mobile Money</option>
+                                                    </select>
+                    </div>
+                    <p style="font-size: 0.85rem; color: #718096;">A receipt is generated automatically and emailed to the customer.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('paymentModal').classList.remove('active')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="background: #38a169;"><i class="fas fa-check"></i> Record Payment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Form -->
+    <form id="deleteForm" method="POST" style="display: none;">
+        <input type="hidden" name="action" value="delete">
+        <input type="hidden" name="id" id="deleteId">
+    </form>
+    
+    <script src="assets/js/main.js"></script>
+    <script>
+        function openAddModal() {
+            document.getElementById('modalTitle').innerHTML = '<i class="fas fa-tools"></i> New Repair Ticket';
+            document.getElementById('formAction').value = 'add';
+            document.getElementById('repairForm').reset();
+            document.getElementById('diagnosisGroup').style.display = 'none';
+            document.getElementById('finalCostGroup').style.display = 'none';
+            document.getElementById('technicianGroup').style.display = 'block';
+            document.getElementById('customerGroup').style.display = 'block';
+            document.getElementById('photoPreviewContainer').style.display = 'none';
+            document.getElementById('photoPreview').style.display = 'none';
+            document.getElementById('itemPhoto').value = '';
+            document.getElementById('repairModal').classList.add('active');
+        }
+        
+        function editRepair(repair) {
+            document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit"></i> Edit Repair';
+            document.getElementById('formAction').value = 'update';
+            document.getElementById('repairId').value = repair.id;
+            document.getElementById('customerName').value = repair.customer_name;
+            document.getElementById('customerPhone').value = repair.customer_phone || '';
+            document.getElementById('customerEmail').value = repair.customer_email || '';
+            document.getElementById('deviceType').value = repair.device_type;
+            document.getElementById('deviceBrand').value = repair.device_brand || '';
+            document.getElementById('deviceModel').value = repair.device_model || '';
+            document.getElementById('serialNumber').value = repair.serial_number || '';
+            document.getElementById('problemDescription').value = repair.problem_description;
+            document.getElementById('diagnosis').value = repair.diagnosis || '';
+            document.getElementById('estimatedCost').value = repair.estimated_cost || '';
+            document.getElementById('finalCost').value = repair.final_cost || '';
+            document.getElementById('priority').value = repair.priority;
+            document.getElementById('technicianId').value = repair.technician_id || '';
+            document.getElementById('customerId').value = repair.customer_id || '';
+            
+            document.getElementById('diagnosisGroup').style.display = 'block';
+            document.getElementById('finalCostGroup').style.display = 'block';
+            document.getElementById('technicianGroup').style.display = 'block';
+            document.getElementById('customerGroup').style.display = 'block';
+            
+            // Show current photo if exists
+            document.getElementById('itemPhoto').value = '';
+            document.getElementById('photoPreview').style.display = 'none';
+            if (repair.item_photo) {
+                document.getElementById('currentPhoto').src = 'uploads/repairs/' + repair.item_photo;
+                document.getElementById('photoPreviewContainer').style.display = 'block';
+            } else {
+                document.getElementById('photoPreviewContainer').style.display = 'none';
+            }
+            
+            document.getElementById('repairModal').classList.add('active');
+        }
+        
+        function closeModal() {
+            document.getElementById('repairModal').classList.remove('active');
+        }
+        
+        function updateStatus(id, status) {
+            const messages = {
+                'item_received': 'Mark this item as received at Sims-Tech?',
+                'in_progress': 'Start working on this repair?',
+                'completed': 'Mark this repair as completed?',
+                'in_transit': 'Mark this item as in transit to customer?',
+                'delivered': 'Mark this device as delivered to customer?'
+            };
+
+            document.getElementById('statusRepairId').value = id;
+            document.getElementById('newStatus').value = status;
+            document.getElementById('statusMessage').textContent = messages[status];
+            document.getElementById('statusModal').classList.add('active');
+        }
+        
+        function closeStatusModal() {
+            document.getElementById('statusModal').classList.remove('active');
+        }
+        
+        function recordPayment(id, ticket, amount) {
+            document.getElementById('paymentRepairId').value = id;
+            document.getElementById('paymentMessage').textContent = 'Record payment of K' + amount + ' for ticket ' + ticket + '?';
+            document.getElementById('paymentModal').classList.add('active');
+        }
+
+        function deleteRepair(id, ticket) {
+            if (confirm('Are you sure you want to delete repair ticket "' + ticket + '"?')) {
+                document.getElementById('deleteId').value = id;
+                document.getElementById('deleteForm').submit();
+            }
+        }
+        
+        function searchRepairs() {
+            const input = document.getElementById('searchInput').value.toLowerCase();
+            const cards = document.querySelectorAll('.repair-card');
+            cards.forEach(card => {
+                const text = card.getAttribute('data-search');
+                card.style.display = text.includes(input) ? '' : 'none';
+            });
+        }
+        
+        function filterByTechnician(technicianId) {
+            const currentUrl = new URL(window.location.href);
+            if (technicianId) {
+                currentUrl.searchParams.set('technician', technicianId);
+            } else {
+                currentUrl.searchParams.delete('technician');
+            }
+            window.location.href = currentUrl.toString();
+        }
+        
+        function previewPhoto(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('photoPreviewImg').src = e.target.result;
+                    document.getElementById('photoPreview').style.display = 'block';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        
+        function viewPhoto(src) {
+            document.getElementById('lightboxImg').src = src;
+            document.getElementById('photoLightbox').style.display = 'flex';
+        }
+        
+        function closeLightbox() {
+            document.getElementById('photoLightbox').style.display = 'none';
+        }
+        
+        function viewSolutions(repairId) {
+            window.location.href = 'repair_solutions.php?repair_id=' + repairId;
+        }
+        
+        // Close modals on overlay click
+        document.getElementById('repairModal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+        document.getElementById('statusModal').addEventListener('click', function(e) {
+            if (e.target === this) closeStatusModal();
+        });
+    </script>
+    
+    <!-- Photo Lightbox -->
+    <div id="photoLightbox" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center; cursor: pointer;" onclick="closeLightbox()">
+        <img id="lightboxImg" src="" alt="Item Photo" style="max-width: 90%; max-height: 90%; border-radius: 8px; box-shadow: 0 4px 30px rgba(0,0,0,0.5); object-fit: contain;">
+        <button style="position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); border: none; color: white; font-size: 2rem; cursor: pointer; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center;" onclick="closeLightbox()">&times;</button>
+    </div>
+</body>
+</html>

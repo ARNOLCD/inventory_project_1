@@ -152,6 +152,10 @@ if (!$receipt_id && $repair['payment_status'] === 'paid') {
             <img src="<?php echo e(companyLogo()); ?>" alt="<?php echo e(companyName()); ?> Logo" onerror="this.style.display='none'" style="max-height: 60px; margin-bottom: 15px;">
             <h1><i class="fas fa-credit-card"></i> Pay for Repair</h1>
             <p>Complete payment for your repair service</p>
+            <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                <a href="customer_dashboard.php" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+                <a href="logout.php" class="btn btn-secondary"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            </div>
         </div>
         
         <?php if ($message): ?>
@@ -259,5 +263,7 @@ if (!$receipt_id && $repair['payment_status'] === 'paid') {
             element.querySelector('input[type="radio"]').checked = true;
         }
     </script>
+    <?php echo customerLogoutFooter(); ?>
+    <?php echo idleLogoutScript(); ?>
 </body>
 </html>

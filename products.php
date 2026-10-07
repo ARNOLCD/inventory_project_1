@@ -142,6 +142,7 @@ $categories = $conn->query("
                 <div style="margin-top: 20px;">
                     <a href="customer_dashboard.php" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
                     <a href="customer_book_repair.php" class="btn btn-primary"><i class="fas fa-tools"></i> Book Repair</a>
+                    <a href="logout.php" class="btn btn-secondary"><i class="fas fa-sign-out-alt"></i> Logout</a>
                 </div>
             </div>
 
@@ -754,5 +755,7 @@ $categories = $conn->query("
             </div>
         </div>
     <?php endif; ?>
+    <?php echo customerLogoutFooter(); ?>
+    <?php echo idleLogoutScript(); ?>
 </body>
 </html>

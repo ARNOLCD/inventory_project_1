@@ -13,6 +13,7 @@ if (isLoggedIn()) {
 }
 
 $error = '';
+$notice = isset($_GET['timeout']) ? 'You were logged out because the system was idle for 5 minutes. Please log in again.' : '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
@@ -305,6 +306,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <p>Sign in to your account to shop products and book repairs</p>
             </div>
             
+            <?php if ($notice): ?>
+                <div class="alert" style="background: #ebf8ff; border: 1px solid #90cdf4; color: #2b6cb0; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                    <i class="fas fa-clock"></i> <?php echo htmlspecialchars($notice); ?>
+                </div>
+            <?php endif; ?>
+
             <?php if ($error): ?>
                 <div class="alert alert-danger" style="background: #fff5f5; border: 1px solid #feb2b2; color: #c53030; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
                     <i class="fas fa-exclamation-circle"></i> <?php echo htmlspecialchars($error); ?>

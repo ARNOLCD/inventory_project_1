@@ -33,10 +33,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'A valid email is required for new users.';
             } elseif (empty($full_name)) {
                 $error = 'Full name is required.';
-            } elseif ($password === '') {
-                $error = 'Please set a default password for the new user.';
             } else {
-                // Admin-chosen default password; the user must change it at first login
+                // New accounts default to 12345678 unless the admin enters a different one;
+                // internal users must change it at first login
+                if ($password === '') {
+                    $password = '12345678';
+                }
                 $default_password = $password;
                 $hashed_password = password_hash($default_password, PASSWORD_DEFAULT);
                 
@@ -88,6 +90,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$error) {
                 if ($stmt->execute()) {
                     $message = 'User updated successfully!' . (!empty($must_change) ? ' The user will be asked to choose a new password at next login.' : '');
+                    if (!empty($password) && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                        sendAdminPasswordResetEmail($email, $username, $password, $full_name);
+                        $message .= ' New login details are being emailed to <strong>' . e($email) . '</strong>.';
+                    }
                 } else {
                     $error = 'Error updating user.';
                 }
@@ -252,7 +258,7 @@ $users = $conn->query("SELECT id, username, full_name, email, phone, role, must_
                     
                     <div id="defaultPasswordInfo" style="display: none; background: #ebf8ff; border: 1px solid #90cdf4; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem;">
                         <p style="margin: 0; color: #2b6cb0; font-size: 0.9rem;">
-                            <i class="fas fa-info-circle"></i> This password is emailed to the user. Internal users must choose their own password the first time they log in.
+                            <i class="fas fa-info-circle"></i> Default password is <strong>12345678</strong> unless you enter a different one. It is emailed to the user; internal users must choose their own password the first time they log in.
                         </p>
                     </div>
                     
@@ -292,13 +298,12 @@ $users = $conn->query("SELECT id, username, full_name, email, phone, role, must_
             document.getElementById('email').required = true;
             document.getElementById('emailHint').style.display = '';
             document.getElementById('phone').value = '';
-            document.getElementById('password').value = '';
-            document.getElementById('password').required = true;
-            document.getElementById('passwordLabel').textContent = 'Default Password *';
-            document.getElementById('passwordHint').textContent = '(min. 8 characters)';
+            document.getElementById('password').value = '12345678';
+            document.getElementById('password').required = false;
+            document.getElementById('passwordLabel').textContent = 'Default Password';
+            document.getElementById('passwordHint').textContent = '(blank or 12345678 = default; min. 8 characters)';
             document.getElementById('passwordGroup').style.display = 'block';
             document.getElementById('defaultPasswordInfo').style.display = 'block';
-            generatePassword();
             document.getElementById('role').value = 'employee';
             document.getElementById('userModal').classList.add('active');
         }

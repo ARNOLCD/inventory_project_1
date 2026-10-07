@@ -97,5 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php endif; ?>
         </p>
     </div>
+    <?php echo customerLogoutFooter(); ?>
+    <?php echo idleLogoutScript(); ?>
 </body>
 </html>

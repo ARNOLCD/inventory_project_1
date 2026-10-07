@@ -38,6 +38,7 @@ $type_titles = [
 ];
 
 $filename = $type_titles[$document['document_type']] . '_' . $document['document_number'] . '.doc';
+$logoUrl = appUrl() . '/' . companyLogo();
 
 // Set headers for Word document download
 header("Content-Type: application/vnd.ms-word");
@@ -164,42 +165,18 @@ header("Expires: 0");
     </style>
 </head>
 <body>
-    <table class="header-table">
-        <tr>
-            <td style="vertical-align: top; width: 60%;">
-                <div class="company-name"><?php echo e(companyName()); ?></div>
-                <div class="tagline">SAVINGS THROUGH MAINTENANCE OF YOUR COMPUTERS</div>
-            </td>
-            <td style="vertical-align: top; width: 40%;">
-                <div class="doc-type"><?php echo $type_titles[$document['document_type']]; ?></div>
-                <div class="doc-num">No. <?php echo htmlspecialchars($document['document_number']); ?></div>
-            </td>
-        </tr>
-    </table>
-    
-    <div class="company-info">
-        <p><strong>UNZA MAIN CAMPUS.</strong> &nbsp;&nbsp;&nbsp; EMAIL: <?php echo htmlspecialchars($company['email'] ?? 'info@actechnology.co.zm'); ?>, TPIN #:<?php echo htmlspecialchars($company['tpin'] ?? '2002530937'); ?></p>
-        <p><strong>NEXT TO THE POST OFFICE.</strong> &nbsp;&nbsp;&nbsp; Mobile: <?php echo htmlspecialchars($company['phone'] ?? '0979145428'); ?>, <?php echo htmlspecialchars($company['mobile'] ?? '0968745131'); ?></p>
-        <p><?php echo htmlspecialchars($company['address'] ?? '+260974728675.'); ?></p>
-    </div>
-    
-    <div class="brands">
-        <span style="color: #0096D6;">hp</span> &nbsp;&nbsp;&nbsp;
-        <span style="color: #E2231A;">Lenovo</span> &nbsp;&nbsp;&nbsp;
-        <span style="color: #000;">DELL</span> &nbsp;&nbsp;&nbsp;
-        <span style="color: #83B81A;">acer</span> &nbsp;&nbsp;&nbsp;
-        <span style="color: #00A4EF;">Microsoft</span>
-    </div>
-    
+    <?php echo documentBanner($logoUrl); ?>
+
+    <?php echo documentContactInfo(); ?>
+
+    <?php echo documentBrands(appUrl() . '/assets/images/doc-brands.png'); ?>
+
+    <?php echo documentTitle($type_titles[$document['document_type']], $document['document_number']); ?>
+
     <table style="margin-bottom: 12pt;">
         <tr>
             <td style="vertical-align: top; width: 50%;">
-                <div class="bank-title">BANK DETAILS</div>
-                <p><strong>BANK:</strong> <?php echo htmlspecialchars($company['bank_name'] ?? 'STANBIC'); ?></p>
-                <p><strong>ACCOUNT NAME:</strong> <?php echo htmlspecialchars($company['account_name'] ?? companyName()); ?></p>
-                <p><strong>Account No:</strong> <?php echo htmlspecialchars($company['account_number'] ?? '6292984114'); ?></p>
-                <p><strong>BRANCH:</strong> <?php echo htmlspecialchars($company['branch'] ?? '260006'); ?></p>
-                <p><strong>PAY TO SALE:</strong> <?php echo htmlspecialchars($company['pay_to_sale'] ?? '0973071800'); ?></p>
+                <?php echo documentBankDetails(); ?>
             </td>
             <td style="vertical-align: top; text-align: right; width: 50%;">
                 <p><strong>DATE:</strong> <?php echo date('d/m/Y', strtotime($document['created_at'])); ?></p>
@@ -217,8 +194,8 @@ header("Expires: 0");
     <table class="items-table" border="1" cellpadding="0" cellspacing="0">
         <thead>
             <tr>
-                <th style="width: 50pt;">QTY</th>
                 <th>DESCRIPTION</th>
+                <th style="width: 50pt;" class="text-center">QTY</th>
                 <th style="width: 80pt;" class="text-right">UNIT PRICE</th>
                 <th style="width: 80pt;" class="text-right">TOTAL</th>
             </tr>
@@ -226,8 +203,8 @@ header("Expires: 0");
         <tbody>
             <?php foreach ($items as $item): ?>
                 <tr>
-                    <td class="text-center"><?php echo $item['quantity']; ?></td>
                     <td><?php echo htmlspecialchars($item['description']); ?></td>
+                    <td class="text-center"><?php echo $item['quantity']; ?></td>
                     <td class="text-right">K<?php echo number_format($item['unit_price'], 2); ?></td>
                     <td class="text-right">K<?php echo number_format($item['total_price'], 2); ?></td>
                 </tr>
@@ -262,19 +239,19 @@ header("Expires: 0");
     </table>
     
     <div class="footer">
-        <p><strong><?php echo e(companyName()); ?></strong></p>
-        
+        <p style="text-align: center;"><strong><?php echo e(companyName()); ?></strong></p>
+
         <?php if ($document['notes']): ?>
             <p style="margin-top: 8pt;"><strong>Notes:</strong> <?php echo nl2br(htmlspecialchars($document['notes'])); ?></p>
         <?php endif; ?>
-        
-        <table style="margin-top: 30pt;">
+
+        <table style="margin-top: 30pt; width: 100%;">
             <tr>
                 <td style="width: 50%;">
                     <div class="sig-line">Prepared by: <?php echo htmlspecialchars($document['created_by'] ?? ''); ?></div>
                 </td>
                 <td style="width: 50%; text-align: right;">
-                    <div class="sig-line" style="display: inline-block;">Customer Signature</div>
+                    <div class="sig-line" style="display: inline-block;">SIGNATURE</div>
                 </td>
             </tr>
         </table>

@@ -198,13 +198,14 @@ $repairs = $conn->query("
     LEFT JOIN users u1 ON r.received_by = u1.id 
     LEFT JOIN users u2 ON r.technician_id = u2.id 
     LEFT JOIN users u3 ON r.customer_id = u3.id 
-    $where 
-    ORDER BY 
-        CASE r.priority 
-            WHEN 'urgent' THEN 1 
-            WHEN 'high' THEN 2 
-            WHEN 'normal' THEN 3 
-            WHEN 'low' THEN 4 
+    $where
+    ORDER BY
+        FIELD(r.status, 'booked', 'item_received', 'in_progress', 'completed', 'in_transit', 'delivered', 'pending_approval', 'rejected', 'cancelled'),
+        CASE r.priority
+            WHEN 'urgent' THEN 1
+            WHEN 'high' THEN 2
+            WHEN 'normal' THEN 3
+            WHEN 'low' THEN 4
         END,
         r.created_at DESC
 ");
@@ -236,14 +237,39 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
         .status-in_transit { background: #9f7aea; color: white; }
         .status-delivered { background: #805ad5; color: white; }
         .status-cancelled { background: #e53e3e; color: white; }
-        .repair-categories { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
-        .repair-category { background: #fff; border-radius: 10px; padding: 14px 10px; text-align: center; text-decoration: none; color: #2d3748; box-shadow: 0 2px 4px rgba(0,0,0,0.08); border-top: 4px solid var(--cat-color); transition: transform 0.15s; }
-        .repair-category:hover { transform: translateY(-2px); }
-        .repair-category.active { background: var(--cat-color); color: #fff; }
-        .repair-category i { color: var(--cat-color); font-size: 1.2rem; }
-        .repair-category.active i { color: #fff; }
-        .repair-category strong { display: block; font-size: 1.5rem; margin: 4px 0 0; }
-        .repair-category span { font-size: 0.8rem; }
+        .repair-categories { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 15px; }
+        .repair-category {
+            background: #fff;
+            border-radius: 12px;
+            padding: 18px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            text-decoration: none;
+            color: #2d3748;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .repair-category:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+        .repair-category.active { background: var(--cat-color); }
+        .repair-category .cat-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 12px;
+            background: var(--cat-color);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            flex-shrink: 0;
+        }
+        .repair-category.active .cat-icon { background: #fff; color: var(--cat-color); }
+        .repair-category .cat-info { display: flex; flex-direction: column; }
+        .repair-category strong { font-size: 1.6rem; line-height: 1.2; }
+        .repair-category span { font-size: 0.85rem; color: #718096; }
+        .repair-category.active strong { color: #fff; }
+        .repair-category.active span { color: rgba(255,255,255,0.9); }
         .status-pending_approval { background: #718096; color: white; }
         .status-rejected { background: #c53030; color: white; }
         .priority-urgent { border-left: 4px solid #e53e3e; }
@@ -288,19 +314,62 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
             flex-wrap: wrap;
         }
         .status-btn {
-            padding: 5px 12px;
+            padding: 8px 14px;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 0.8rem;
+            font-size: 0.85rem;
+            font-weight: 500;
             transition: all 0.2s;
         }
-        .status-btn:hover { opacity: 0.8; }
+        .status-btn:hover { opacity: 0.8; transform: translateY(-1px); }
+        .status-btn i { font-size: 1rem; margin-right: 4px; }
         .btn-receive { background: #4299e1; color: white; }
         .btn-start { background: #dd6b20; color: white; }
         .btn-complete { background: #38a169; color: white; }
         .btn-transit { background: #9f7aea; color: white; }
         .btn-deliver { background: #805ad5; color: white; }
+
+        /* Group headers that split the list by repair status */
+        .status-group-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 22px 0 12px;
+            font-size: 1.05rem;
+            font-weight: 600;
+        }
+        .status-group-header .status-group-count {
+            background: #edf2f7;
+            color: #4a5568;
+            border-radius: 12px;
+            padding: 2px 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        /* Per-repair workflow tracker: Received -> Working -> Done -> Transit -> Delivered */
+        .repair-steps { display: flex; align-items: flex-start; margin: 16px 0 6px; }
+        .repair-step { display: flex; flex-direction: column; align-items: center; width: 84px; text-align: center; }
+        .repair-step i {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            background: #edf2f7;
+            color: #cbd5e0;
+        }
+        .repair-step span { font-size: 0.75rem; color: #718096; margin-top: 5px; line-height: 1.1; font-weight: 500; }
+        .repair-step.done i { background: #c6f6d5; color: #276749; }
+        .repair-step.done span { color: #2f855a; }
+        .repair-step.current i { background: var(--step-color); color: #fff; box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--step-color); }
+        .repair-step.current span { color: var(--step-color); font-weight: 700; }
+        .step-line { flex: 1; height: 3px; background: #edf2f7; margin-top: 22px; border-radius: 2px; min-width: 12px; }
+        .step-line.done { background: #c6f6d5; }
+        .repair-badge { padding: 8px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -334,9 +403,11 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
                         <?php [$status_icon, $status_color] = REPAIR_STATUS_STYLES[$status_key]; ?>
                         <a href="<?php echo $status_key === 'pending_approval' ? 'repair_requests.php' : 'repairs.php?status=' . $status_key; ?>"
                            class="repair-category <?php echo $status_filter === $status_key ? 'active' : ''; ?>" style="--cat-color: <?php echo $status_color; ?>;">
-                            <i class="fas <?php echo $status_icon; ?>"></i>
-                            <strong><?php echo (int)($status_counts[$status_key] ?? 0); ?></strong>
-                            <span><?php echo e($status_label); ?></span>
+                            <div class="cat-icon"><i class="fas <?php echo $status_icon; ?>"></i></div>
+                            <div class="cat-info">
+                                <strong><?php echo (int)($status_counts[$status_key] ?? 0); ?></strong>
+                                <span><?php echo e($status_label); ?></span>
+                            </div>
                         </a>
                     <?php endforeach; ?>
                 </div>
@@ -370,10 +441,20 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
                     </div>
                 </div>
                 
-                <!-- Repairs List -->
+                <!-- Repairs List (grouped by status: booked, received, in progress, completed, in transit, delivered) -->
                 <div id="repairsList">
                     <?php if ($repairs->num_rows > 0): ?>
+                        <?php $last_status = null; ?>
                         <?php while ($repair = $repairs->fetch_assoc()): ?>
+                            <?php if ($repair['status'] !== $last_status):
+                                $last_status = $repair['status'];
+                                [$g_icon, $g_color] = REPAIR_STATUS_STYLES[$repair['status']]; ?>
+                                <div class="status-group-header" style="color: <?php echo $g_color; ?>;">
+                                    <i class="fas <?php echo $g_icon; ?>"></i>
+                                    <?php echo e(repairStatusLabel($repair['status'])); ?>
+                                    <span class="status-group-count"><?php echo (int)($status_counts[$repair['status']] ?? 0); ?></span>
+                                </div>
+                            <?php endif; ?>
                             <div class="repair-card priority-<?php echo $repair['priority']; ?>" data-search="<?php echo strtolower($repair['ticket_number'] . ' ' . $repair['customer_name'] . ' ' . $repair['device_type'] . ' ' . $repair['device_brand'] . ' ' . ($repair['technician_name'] ?? '')); ?>">
                                 <div class="repair-header">
                                     <div>
@@ -394,8 +475,9 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
                                         <?php endif; ?>
                                     </div>
                                     <div style="text-align: right;">
-                                        <span class="badge status-<?php echo $repair['status']; ?>" style="padding: 5px 12px; border-radius: 20px;">
-                                            <?php echo e(repairStatusLabel($repair['status'])); ?>
+                                        <?php [$b_icon, $b_color] = REPAIR_STATUS_STYLES[$repair['status']]; ?>
+                                        <span class="badge status-<?php echo $repair['status']; ?> repair-badge">
+                                            <i class="fas <?php echo $b_icon; ?>"></i> <?php echo e(repairStatusLabel($repair['status'])); ?>
                                         </span>
                                         <div style="font-size: 0.8rem; color: #718096; margin-top: 5px;">
                                             <?php echo date('M d, Y', strtotime($repair['received_date'])); ?>
@@ -429,7 +511,30 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
                                         <strong>Diagnosis:</strong> <?php echo htmlspecialchars($repair['diagnosis']); ?>
                                     </div>
                                 <?php endif; ?>
-                                
+
+                                <!-- Workflow tracker: symbols show the stage clearly without clicking anything -->
+                                <?php
+                                $status_order = ['booked', 'item_received', 'in_progress', 'completed', 'in_transit', 'delivered'];
+                                $current_pos = array_search($repair['status'], $status_order, true);
+                                $current_pos = $current_pos === false ? -1 : $current_pos;
+                                $workflow_steps = ['item_received' => 'Received', 'in_progress' => 'Working', 'completed' => 'Done', 'in_transit' => 'Transit', 'delivered' => 'Delivered'];
+                                ?>
+                                <div class="repair-steps">
+                                    <?php foreach ($workflow_steps as $step => $step_label):
+                                        [$s_icon, $s_color] = REPAIR_STATUS_STYLES[$step];
+                                        $step_pos = array_search($step, $status_order, true);
+                                        $state = $step_pos < $current_pos ? 'done' : ($step_pos === $current_pos ? 'current' : '');
+                                    ?>
+                                        <div class="repair-step <?php echo $state; ?>" style="--step-color: <?php echo $s_color; ?>;" title="<?php echo e(repairStatusLabel($step)); ?>">
+                                            <i class="fas <?php echo $s_icon; ?>"></i>
+                                            <span><?php echo $step_label; ?></span>
+                                        </div>
+                                        <?php if ($step !== 'delivered'): ?>
+                                            <div class="step-line <?php echo $step_pos < $current_pos ? 'done' : ''; ?>"></div>
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
+                                </div>
+
                                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                                     <div style="font-size: 0.85rem; color: #718096;">
                                         <?php if ($repair['estimated_cost']): ?>
@@ -456,23 +561,23 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
                                     
                                     <div class="repair-actions">
                                         <?php if ($repair['status'] === 'booked'): ?>
-                                            <button class="status-btn btn-receive" onclick="updateStatus(<?php echo $repair['id']; ?>, 'item_received')">
+                                            <button class="status-btn btn-receive" title="Mark that the device has arrived at the workshop" onclick="updateStatus(<?php echo $repair['id']; ?>, 'item_received')">
                                                 <i class="fas fa-box"></i> Item Received
                                             </button>
                                         <?php elseif ($repair['status'] === 'item_received'): ?>
-                                            <button class="status-btn btn-start" onclick="updateStatus(<?php echo $repair['id']; ?>, 'in_progress')">
+                                            <button class="status-btn btn-start" title="Start working on this repair" onclick="updateStatus(<?php echo $repair['id']; ?>, 'in_progress')">
                                                 <i class="fas fa-play"></i> Start Work
                                             </button>
                                         <?php elseif ($repair['status'] === 'in_progress'): ?>
-                                            <button class="status-btn btn-complete" onclick="updateStatus(<?php echo $repair['id']; ?>, 'completed')">
+                                            <button class="status-btn btn-complete" title="Repair work is finished" onclick="updateStatus(<?php echo $repair['id']; ?>, 'completed')">
                                                 <i class="fas fa-check"></i> Mark Complete
                                             </button>
                                         <?php elseif ($repair['status'] === 'completed'): ?>
-                                            <button class="status-btn btn-transit" onclick="updateStatus(<?php echo $repair['id']; ?>, 'in_transit')">
-                                                <i class="fas fa-shipping-fast"></i> In Transit
+                                            <button class="status-btn btn-transit" title="Device is on its way back to the customer" onclick="updateStatus(<?php echo $repair['id']; ?>, 'in_transit')">
+                                                <i class="fas fa-shipping-fast"></i> Send to Transit
                                             </button>
                                         <?php elseif ($repair['status'] === 'in_transit'): ?>
-                                            <button class="status-btn btn-deliver" onclick="updateStatus(<?php echo $repair['id']; ?>, 'delivered')">
+                                            <button class="status-btn btn-deliver" title="Customer has received the device" onclick="updateStatus(<?php echo $repair['id']; ?>, 'delivered')">
                                                 <i class="fas fa-hand-holding"></i> Mark Delivered
                                             </button>
                                         <?php endif; ?>

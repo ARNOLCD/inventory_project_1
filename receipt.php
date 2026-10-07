@@ -49,14 +49,7 @@ $back = isStaff() ? ($receipt['source_type'] === 'repair' ? 'repairs.php' : 'sal
         .toolbar .secondary { background: #718096; }
         .notice { max-width: 760px; margin: 0 auto 15px; background: #f0fff4; border: 1px solid #9ae6b4; padding: 10px 15px; border-radius: 6px; }
         .receipt { max-width: 760px; margin: 0 auto; background: #fff; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); position: relative; }
-        .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1a365d; padding-bottom: 20px; gap: 20px; }
-        .head img { max-height: 80px; max-width: 200px; }
-        .company h1 { margin: 0 0 5px; color: #1a365d; font-size: 22px; }
-        .company p { margin: 2px 0; font-size: 13px; color: #4a5568; }
-        .title { text-align: right; }
-        .title h2 { margin: 0; font-size: 28px; letter-spacing: 3px; color: #1a365d; }
-        .title p { margin: 4px 0; font-size: 13px; }
-        .meta { display: flex; justify-content: space-between; margin: 25px 0; gap: 20px; font-size: 14px; }
+        .meta { display: flex; justify-content: space-between; margin: 20px 0; gap: 20px; font-size: 13px; }
         .meta h4 { margin: 0 0 6px; color: #718096; font-size: 12px; text-transform: uppercase; }
         .meta p { margin: 2px 0; }
         table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -64,7 +57,7 @@ $back = isStaff() ? ($receipt['source_type'] === 'repair' ? 'repairs.php' : 'sal
         td { padding: 10px; border-bottom: 1px solid #e2e8f0; }
         .num { text-align: right; }
         .total td { font-size: 16px; font-weight: bold; border-bottom: none; }
-        .stamp { position: absolute; right: 50px; top: 170px; border: 4px solid #38a169; color: #38a169; font-size: 30px; font-weight: bold; padding: 6px 18px; transform: rotate(-12deg); border-radius: 8px; opacity: 0.6; }
+        .stamp { position: absolute; right: 50px; top: 190px; border: 4px solid #38a169; color: #38a169; font-size: 30px; font-weight: bold; padding: 6px 18px; transform: rotate(-12deg); border-radius: 8px; opacity: 0.6; }
         .foot { margin-top: 30px; text-align: center; font-size: 12px; color: #718096; border-top: 1px solid #e2e8f0; padding-top: 15px; }
         @media print {
             body { background: #fff; padding: 0; }
@@ -80,37 +73,31 @@ $back = isStaff() ? ($receipt['source_type'] === 'repair' ? 'repairs.php' : 'sal
         <?php if (isStaff() && filter_var($receipt['client_email'], FILTER_VALIDATE_EMAIL)): ?>
             <form method="POST" style="margin: 0;"><button type="submit" name="resend" value="1" class="secondary"><i class="fas fa-envelope"></i> Email to client</button></form>
         <?php endif; ?>
+        <?php if (!isStaff()): ?>
+            <a href="logout.php" class="secondary"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        <?php endif; ?>
     </div>
     <?php if ($message): ?><div class="notice"><?php echo $message; ?></div><?php endif; ?>
 
     <div class="receipt">
         <div class="stamp">PAID</div>
-        <div class="head">
-            <div class="company">
-                <img src="<?php echo e(companyLogo()); ?>" alt="<?php echo e(companyName()); ?>" onerror="this.style.display='none'">
-                <h1><?php echo e(companyName()); ?></h1>
-                <?php if (!empty($company['address'])): ?><p><?php echo nl2br(e($company['address'])); ?></p><?php endif; ?>
-                <?php if (!empty($company['phone']) || !empty($company['mobile'])): ?><p>Tel: <?php echo e(trim(($company['phone'] ?? '') . ' / ' . ($company['mobile'] ?? ''), ' /')); ?></p><?php endif; ?>
-                <?php if (!empty($company['email'])): ?><p><?php echo e($company['email']); ?></p><?php endif; ?>
-                <?php if (!empty($company['tpin'])): ?><p>TPIN: <?php echo e($company['tpin']); ?></p><?php endif; ?>
-            </div>
-            <div class="title">
-                <h2>RECEIPT</h2>
-                <p><strong>No:</strong> <?php echo e($receipt['document_number']); ?></p>
-                <p><strong>Date:</strong> <?php echo date('M d, Y H:i', strtotime($receipt['created_at'])); ?></p>
-            </div>
-        </div>
+        <?php echo documentBanner(); ?>
+
+        <?php echo documentContactInfo(); ?>
+
+        <?php echo documentBrands(); ?>
+
+        <?php echo documentTitle('RECEIPT', $receipt['document_number']); ?>
 
         <div class="meta">
             <div>
-                <h4>Received from</h4>
-                <p><strong><?php echo e($receipt['client_name']); ?></strong></p>
-                <?php if ($receipt['client_phone']): ?><p><?php echo e($receipt['client_phone']); ?></p><?php endif; ?>
-                <?php if ($receipt['client_email']): ?><p><?php echo e($receipt['client_email']); ?></p><?php endif; ?>
+                <?php echo documentBankDetails(); ?>
             </div>
             <div style="text-align: right;">
-                <h4>Payment</h4>
-                <p><?php echo e(paymentMethodLabel($receipt['payment_method'])); ?></p>
+                <p><strong>DATE:</strong> <?php echo date('d/m/Y', strtotime($receipt['created_at'])); ?></p>
+                <p><strong>CLIENT NAME:</strong> <?php echo e($receipt['client_name']); ?></p>
+                <?php if ($receipt['client_phone']): ?><p><strong>PHONE:</strong> <?php echo e($receipt['client_phone']); ?></p><?php endif; ?>
+                <p><strong>PAYMENT:</strong> <?php echo e(paymentMethodLabel($receipt['payment_method'])); ?></p>
                 <p><?php echo e($receipt['notes']); ?></p>
             </div>
         </div>
@@ -136,10 +123,13 @@ $back = isStaff() ? ($receipt['source_type'] === 'repair' ? 'repairs.php' : 'sal
         </table>
 
         <div class="foot">
+            <p><strong><?php echo e(companyName()); ?></strong></p>
             <p>Thank you for your business!</p>
-            <p>This receipt was generated automatically by the <?php echo e(companyName()); ?> system.</p>
+            <div style="margin-top: 40px; display: inline-block; width: 220px; border-top: 1px solid #333; padding-top: 5px; font-size: 12px;">SIGNATURE</div>
         </div>
     </div>
     <?php if (isset($_GET['print'])): ?><script>window.addEventListener('load', () => window.print());</script><?php endif; ?>
+    <?php echo customerLogoutFooter(); ?>
+    <?php echo idleLogoutScript(); ?>
 </body>
 </html>

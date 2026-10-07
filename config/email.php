@@ -7,7 +7,7 @@ require_once __DIR__ . '/database.php';
 define('SMTP_HOST', getSetting('smtp_host', 'smtp.gmail.com'));
 define('SMTP_PORT', (int)getSetting('smtp_port', '587'));
 define('SMTP_USERNAME', getSetting('smtp_username'));
-define('SMTP_PASSWORD', getSetting('smtp_password'));
+define('SMTP_PASSWORD', preg_replace('/\s+/', '', getSetting('smtp_password')));
 define('SMTP_FROM_EMAIL', getSetting('smtp_from_email', SMTP_USERNAME));
 define('SMTP_FROM_NAME', getSetting('smtp_from_name', companyName()));
 define('SMTP_ENCRYPTION', getSetting('smtp_encryption', 'tls'));
@@ -384,6 +384,29 @@ function sendNewUserEmail($email, $username, $password, $fullName) {
         <p>If you have any questions, please contact your system administrator.</p>";
 
     return queueEmail($email, "Welcome to " . companyName() . " - Your Account Details", emailLayout('Welcome, ' . $fullName . '!', 'Your Account', $content));
+}
+
+/**
+ * Email a user their new credentials after an admin resets their password
+ */
+function sendAdminPasswordResetEmail($email, $username, $password, $fullName) {
+    $loginLink = e(SYSTEM_URL . "/login.php");
+    $content = "
+        <p>Hello <strong>" . e($fullName) . "</strong>,</p>
+        <p>An administrator has reset the password on your account. Here are your login credentials:</p>
+        <div style='background: #fff; border: 2px solid #667eea; padding: 20px; border-radius: 10px; margin: 20px 0;'>
+            <p><strong>Username:</strong> " . e($username) . "</p>
+            <p><strong>Temporary password:</strong> " . e($password) . "</p>
+        </div>
+        <div style='background: #fff5f5; border-left: 4px solid #fc8181; padding: 10px 15px; margin: 15px 0;'>
+            <strong>Security notice:</strong> You will be asked to choose a new password the next time you log in.
+        </div>
+        <p style='text-align: center;'>
+            <a href='$loginLink' style='display: inline-block; background: #48bb78; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0;'>Login to Your Account</a>
+        </p>
+        <p>If you did not expect this change, please contact your system administrator immediately.</p>";
+
+    return queueEmail($email, "Password Reset - " . companyName(), emailLayout('Password Reset', 'Account Security', $content));
 }
 
 /**

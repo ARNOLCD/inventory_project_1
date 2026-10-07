@@ -3,7 +3,7 @@
 // runMigrations() compares the stored schema_version with SCHEMA_VERSION and only
 // does work when the code is newer than the database.
 
-define('SCHEMA_VERSION', 1);
+define('SCHEMA_VERSION', 2);
 
 function runMigrations($conn) {
     if ((int)getSetting('schema_version', 0) >= SCHEMA_VERSION) {
@@ -17,7 +17,15 @@ function runMigrations($conn) {
     }
 
     try {
-        if ((int)getSetting('schema_version', 0) < SCHEMA_VERSION && migrateToV1($conn)) {
+        $current = (int)getSetting('schema_version', 0);
+        $ok = true;
+        if ($ok && $current < 1) {
+            $ok = migrateToV1($conn);
+        }
+        if ($ok && $current < 2) {
+            $ok = migrateToV2($conn);
+        }
+        if ($ok) {
             $conn->query("INSERT INTO system_settings (setting_key, setting_value) VALUES ('schema_version', '" . SCHEMA_VERSION . "')
                           ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
             getSettings(true);
@@ -199,4 +207,11 @@ function migrateToV1($conn) {
 
     getSettings(true);
     return $ok;
+}
+
+// Fail closed: any account created without an explicit role becomes a customer, never staff
+function migrateToV2($conn) {
+    return runMigrationStatements($conn, [
+        "ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'employee', 'technician', 'sales', 'customer') DEFAULT 'customer'",
+    ]);
 }

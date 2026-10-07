@@ -1,6 +1,24 @@
 <?php
 session_start();
 
+// Idle timeout: users are logged out after 5 minutes of inactivity. This server-side check
+// runs on every page that loads session.php; idleLogoutScript() provides the client-side part.
+define('IDLE_TIMEOUT', 300);
+
+if (isset($_SESSION['user_id'], $_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > IDLE_TIMEOUT) {
+    session_unset();
+    session_destroy();
+    if (basename(dirname($_SERVER['PHP_SELF'] ?? '')) === 'ajax') {
+        header('HTTP/1.0 401 Unauthorized');
+        exit('Session expired');
+    }
+    header('Location: ' . (function_exists('appUrl') ? appUrl() . '/login.php' : 'login.php') . '?timeout=1');
+    exit();
+}
+if (isset($_SESSION['user_id'])) {
+    $_SESSION['last_activity'] = time();
+}
+
 // Internal (staff) roles - all of these can use the inventory system and handle repair requests
 define('STAFF_ROLES', ['admin', 'employee', 'technician', 'sales']);
 define('USER_ROLES', array_merge(STAFF_ROLES, ['customer']));
@@ -89,11 +107,38 @@ function roleLabel($role) {
     return ROLE_LABELS[$role] ?? ucfirst((string)$role);
 }
 
+// Client-side half of the idle timeout: redirects to logout.php after 5 minutes without
+// mouse/keyboard activity. Renders nothing for visitors who are not logged in.
+function idleLogoutScript() {
+    if (!isLoggedIn()) {
+        return '';
+    }
+    $ms = IDLE_TIMEOUT * 1000;
+    return "<script>(function(){if(window.__idleLogout)return;window.__idleLogout=1;var t;"
+        . "function go(){window.location.href='logout.php?idle=1';}"
+        . "function reset(){clearTimeout(t);t=setTimeout(go,$ms);}"
+        . "['mousemove','mousedown','keydown','scroll','touchstart'].forEach(function(e){window.addEventListener(e,reset,{passive:true});});"
+        . "reset();})();</script>";
+}
+
+// Prominent logout button rendered at the bottom of customer-facing pages.
+// Renders nothing for staff or logged-out visitors.
+function customerLogoutFooter() {
+    if (!isLoggedIn() || !isCustomer()) {
+        return '';
+    }
+    return '<div style="text-align: center; margin: 35px 0 15px;">'
+        . '<a href="logout.php" class="btn" style="background: #e53e3e; color: #fff; padding: 14px 36px; '
+        . 'font-size: 1rem; font-weight: 600; border-radius: 8px; text-decoration: none; display: inline-block; '
+        . 'box-shadow: 0 3px 8px rgba(229,62,62,0.35);">'
+        . '<i class="fas fa-sign-out-alt"></i> Logout</a></div>';
+}
+
 // Destroy session
-function logout() {
+function logout($idle = false) {
     session_unset();
     session_destroy();
-    header('Location: login.php');
+    header('Location: login.php' . ($idle ? '?timeout=1' : ''));
     exit();
 }
 ?>

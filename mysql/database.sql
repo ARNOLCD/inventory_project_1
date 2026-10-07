@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
     full_name VARCHAR(100) NOT NULL,
     email VARCHAR(100),
     phone VARCHAR(20),
-    role ENUM('admin', 'employee', 'technician', 'sales', 'customer') DEFAULT 'employee',
+    role ENUM('admin', 'employee', 'technician', 'sales', 'customer') DEFAULT 'customer',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );

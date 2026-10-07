@@ -238,17 +238,17 @@ $cart_count = 0; // This would be dynamic in a real implementation
             <div class="customer-info">
                 <img src="<?php echo e(companyLogo()); ?>" alt="<?php echo e(companyName()); ?> Logo" onerror="this.style.display='none'" style="max-height: 40px; margin-bottom: 10px;">
                 <h1>Welcome, <?php echo htmlspecialchars($user['full_name']); ?></h1>
-                <p><?php echo htmlspecialchars($user['email'] ?? ''); ?> | <?php echo htmlspecialchars($user['phone'] ?? ''); ?></p>
+                <p><?php echo e(implode('  |  ', array_filter([$user['email'] ?? '', $user['phone'] ?? '']))); ?></p>
             </div>
             <div class="customer-actions">
                 <a href="products.php" class="btn btn-primary">
-                    <i class="fas fa-shopping-cart"></i> Shop Products
+                    <i class="fas fa-shopping-cart"></i> View Our Products
                 </a>
-                <a href="customer_book_repair.php" class="btn btn-secondary">
-                    <i class="fas fa-plus"></i> Book New Repair
+                <a href="index.php#services" class="btn btn-primary">
+                    <i class="fas fa-cogs"></i> Our Services
                 </a>
-                <a href="logout.php" class="btn btn-secondary">
-                    <i class="fas fa-sign-out-alt"></i> Logout
+                <a href="index.php" class="btn btn-primary">
+                    <i class="fas fa-home"></i> Back to Home Page
                 </a>
             </div>
         </div>
@@ -306,9 +306,14 @@ $cart_count = 0; // This would be dynamic in a real implementation
         <div class="repairs-section">
             <div class="section-header">
                 <h2><i class="fas fa-tools"></i> My Repairs</h2>
-                <span style="color: #718096; font-size: 0.9rem;">
-                    Total: <?php echo $repairs->num_rows; ?> repairs
-                </span>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="color: #718096; font-size: 0.9rem;">
+                        Total: <?php echo $repairs->num_rows; ?> repairs
+                    </span>
+                    <a href="customer_book_repair.php" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus"></i> Book New Repair
+                    </a>
+                </div>
             </div>
 
             <?php if ($repairs->num_rows > 0): ?>
@@ -535,5 +540,7 @@ $cart_count = 0; // This would be dynamic in a real implementation
         // Update cart count periodically (in case it changes in other tabs)
         setInterval(updateCartCount, 1000);
     </script>
+    <?php echo customerLogoutFooter(); ?>
+    <?php echo idleLogoutScript(); ?>
 </body>
 </html>

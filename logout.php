@@ -1,4 +1,4 @@
 <?php
 require_once 'config/session.php';
-logout();
+logout(isset($_GET['idle']));
 ?>

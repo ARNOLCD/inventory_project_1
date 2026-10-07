@@ -37,6 +37,10 @@ $type_titles = [
     'receipt' => 'RECEIPT'
 ];
 
+// dompdf loads images from local paths, not URLs
+$logoFile = __DIR__ . '/' . strtok(companyLogo(), '?');
+$brandsFile = __DIR__ . '/assets/images/doc-brands.png';
+
 // Generate HTML for PDF
 $html = '
 <!DOCTYPE html>
@@ -92,44 +96,14 @@ $html = '
     </style>
 </head>
 <body>
-    <div class="container">
-        <table style="width: 100%; margin-bottom: 20px; border-bottom: 3px solid #1a365d; padding-bottom: 15px;">
+    <div class="container">'
+    . documentBanner($logoFile)
+    . documentContactInfo()
+    . documentBrands($brandsFile)
+    . documentTitle($type_titles[$document['document_type']], $document['document_number'])
+    . '<table style="width: 100%; margin-bottom: 15px;">
             <tr>
-                <td style="vertical-align: top;">
-                    <div style="font-size: 24px; font-weight: bold; color: #1a365d;">' . e(companyName()) . '</div>
-                    <div style="font-size: 10px; color: #666; font-style: italic;">SAVINGS THROUGH MAINTENANCE OF YOUR COMPUTERS</div>
-                </td>
-                <td style="text-align: right; vertical-align: top;">
-                    <div style="font-size: 28px; font-weight: bold; color: #1a365d;">' . $type_titles[$document['document_type']] . '</div>
-                    <div style="font-size: 12px; color: #666;">No. ' . htmlspecialchars($document['document_number']) . '</div>
-                </td>
-            </tr>
-        </table>
-        
-        <div class="company-info">
-            <p><strong>UNZA MAIN CAMPUS.</strong> &nbsp;&nbsp;&nbsp; EMAIL: ' . htmlspecialchars($company['email'] ?? 'info@actechnology.co.zm') . ', TPIN #:' . htmlspecialchars($company['tpin'] ?? '2002530937') . '</p>
-            <p><strong>NEXT TO THE POST OFFICE.</strong> &nbsp;&nbsp;&nbsp; Mobile: ' . htmlspecialchars($company['phone'] ?? '0979145428') . ', ' . htmlspecialchars($company['mobile'] ?? '0968745131') . '</p>
-            <p>' . htmlspecialchars($company['address'] ?? '+260974728675.') . '</p>
-        </div>
-        
-        <div class="brands">
-            <span style="color: #0096D6;">hp</span>
-            <span style="color: #E2231A;">Lenovo</span>
-            <span style="color: #000;">DELL</span>
-            <span style="color: #83B81A;">acer</span>
-            <span style="color: #00A4EF;">Microsoft</span>
-        </div>
-        
-        <table style="width: 100%; margin-bottom: 15px;">
-            <tr>
-                <td style="vertical-align: top; width: 50%;">
-                    <div class="bank-title">BANK DETAILS</div>
-                    <p><strong>BANK:</strong> ' . htmlspecialchars($company['bank_name'] ?? 'STANBIC') . '</p>
-                    <p><strong>ACCOUNT NAME:</strong> ' . htmlspecialchars($company['account_name'] ?? companyName()) . '</p>
-                    <p><strong>Account No:</strong> ' . htmlspecialchars($company['account_number'] ?? '6292984114') . '</p>
-                    <p><strong>BRANCH:</strong> ' . htmlspecialchars($company['branch'] ?? '260006') . '</p>
-                    <p><strong>PAY TO SALE:</strong> ' . htmlspecialchars($company['pay_to_sale'] ?? '0973071800') . '</p>
-                </td>
+                <td style="vertical-align: top; width: 50%;">' . documentBankDetails() . '</td>
                 <td style="vertical-align: top; text-align: right; width: 50%;">
                     <p><strong>DATE:</strong> ' . date('d/m/Y', strtotime($document['created_at'])) . '</p>
                     <p><strong>CLIENT NAME:</strong> ' . htmlspecialchars($document['client_name']) . '</p>';
@@ -149,8 +123,8 @@ $html .= '
         <table class="items">
             <thead>
                 <tr>
-                    <th style="width: 60px;">QTY</th>
                     <th>DESCRIPTION</th>
+                    <th style="width: 60px; text-align: center;">QTY</th>
                     <th style="width: 100px; text-align: right;">UNIT PRICE</th>
                     <th style="width: 100px; text-align: right;">TOTAL</th>
                 </tr>
@@ -160,8 +134,8 @@ $html .= '
 foreach ($items as $item) {
     $html .= '
                 <tr>
-                    <td class="text-center">' . $item['quantity'] . '</td>
                     <td>' . htmlspecialchars($item['description']) . '</td>
+                    <td class="text-center">' . $item['quantity'] . '</td>
                     <td class="text-right">K' . number_format($item['unit_price'], 2) . '</td>
                     <td class="text-right">K' . number_format($item['total_price'], 2) . '</td>
                 </tr>';
@@ -204,7 +178,7 @@ $html .= '
         </table>
         
         <div class="footer">
-            <p><strong>' . e(companyName()) . '</strong></p>';
+            <p style="text-align: center;"><strong>' . e(companyName()) . '</strong></p>';
 
 if ($document['notes']) {
     $html .= '<p style="margin-top: 10px;"><strong>Notes:</strong> ' . nl2br(htmlspecialchars($document['notes'])) . '</p>';
@@ -221,7 +195,7 @@ $html .= '
                         </td>
                         <td style="width: 50%; text-align: right;">
                             <div style="border-top: 1px solid #333; width: 200px; padding-top: 5px; display: inline-block;">
-                                Customer Signature
+                                SIGNATURE
                             </div>
                         </td>
                     </tr>
@@ -315,42 +289,18 @@ if (file_exists('vendor/autoload.php')) {
     </div>
     
     <div class="print-container">
-        <table class="header-table">
-            <tr>
-                <td style="vertical-align: top;">
-                    <div class="company-name"><?php echo e(companyName()); ?></div>
-                    <div class="tagline">SAVINGS THROUGH MAINTENANCE OF YOUR COMPUTERS</div>
-                </td>
-                <td style="text-align: right; vertical-align: top;">
-                    <div class="doc-type"><?php echo $type_titles[$document['document_type']]; ?></div>
-                    <div class="doc-num">No. <?php echo htmlspecialchars($document['document_number']); ?></div>
-                </td>
-            </tr>
-        </table>
-        
-        <div class="company-info">
-            <p><strong>UNZA MAIN CAMPUS.</strong> &nbsp;&nbsp;&nbsp; EMAIL: <?php echo htmlspecialchars($company['email'] ?? 'info@actechnology.co.zm'); ?>, TPIN #:<?php echo htmlspecialchars($company['tpin'] ?? '2002530937'); ?></p>
-            <p><strong>NEXT TO THE POST OFFICE.</strong> &nbsp;&nbsp;&nbsp; Mobile: <?php echo htmlspecialchars($company['phone'] ?? '0979145428'); ?>, <?php echo htmlspecialchars($company['mobile'] ?? '0968745131'); ?></p>
-            <p><?php echo htmlspecialchars($company['address'] ?? '+260974728675.'); ?></p>
-        </div>
-        
-        <div class="brands">
-            <span style="color: #0096D6;">hp</span>
-            <span style="color: #E2231A;">Lenovo</span>
-            <span style="color: #000;">DELL</span>
-            <span style="color: #83B81A;">acer</span>
-            <span style="color: #00A4EF;">Microsoft</span>
-        </div>
-        
+        <?php echo documentBanner(); ?>
+
+        <?php echo documentContactInfo(); ?>
+
+        <?php echo documentBrands(); ?>
+
+        <?php echo documentTitle($type_titles[$document['document_type']], $document['document_number']); ?>
+
         <table class="info-table">
             <tr>
                 <td style="vertical-align: top; width: 50%;">
-                    <div class="bank-title">BANK DETAILS</div>
-                    <p><strong>BANK:</strong> <?php echo htmlspecialchars($company['bank_name'] ?? 'STANBIC'); ?></p>
-                    <p><strong>ACCOUNT NAME:</strong> <?php echo htmlspecialchars($company['account_name'] ?? companyName()); ?></p>
-                    <p><strong>Account No:</strong> <?php echo htmlspecialchars($company['account_number'] ?? '6292984114'); ?></p>
-                    <p><strong>BRANCH:</strong> <?php echo htmlspecialchars($company['branch'] ?? '260006'); ?></p>
-                    <p><strong>PAY TO SALE:</strong> <?php echo htmlspecialchars($company['pay_to_sale'] ?? '0973071800'); ?></p>
+                    <?php echo documentBankDetails(); ?>
                 </td>
                 <td style="vertical-align: top; text-align: right; width: 50%;">
                     <p><strong>DATE:</strong> <?php echo date('d/m/Y', strtotime($document['created_at'])); ?></p>
@@ -368,8 +318,8 @@ if (file_exists('vendor/autoload.php')) {
         <table class="items">
             <thead>
                 <tr>
-                    <th style="width: 60px;">QTY</th>
                     <th>DESCRIPTION</th>
+                    <th style="width: 60px; text-align: center;">QTY</th>
                     <th style="width: 100px; text-align: right;">UNIT PRICE</th>
                     <th style="width: 100px; text-align: right;">TOTAL</th>
                 </tr>
@@ -377,8 +327,8 @@ if (file_exists('vendor/autoload.php')) {
             <tbody>
                 <?php foreach ($items as $item): ?>
                     <tr>
-                        <td class="text-center"><?php echo $item['quantity']; ?></td>
                         <td><?php echo htmlspecialchars($item['description']); ?></td>
+                        <td class="text-center"><?php echo $item['quantity']; ?></td>
                         <td class="text-right">K<?php echo number_format($item['unit_price'], 2); ?></td>
                         <td class="text-right">K<?php echo number_format($item['total_price'], 2); ?></td>
                     </tr>
@@ -413,19 +363,19 @@ if (file_exists('vendor/autoload.php')) {
         </table>
         
         <div class="footer">
-            <p><strong><?php echo e(companyName()); ?></strong></p>
-            
+            <p style="text-align: center;"><strong><?php echo e(companyName()); ?></strong></p>
+
             <?php if ($document['notes']): ?>
                 <p style="margin-top: 10px;"><strong>Notes:</strong> <?php echo nl2br(htmlspecialchars($document['notes'])); ?></p>
             <?php endif; ?>
-            
+
             <table class="sig-table">
                 <tr>
                     <td style="width: 50%;">
                         <div class="sig-line">Prepared by: <?php echo htmlspecialchars($document['created_by'] ?? ''); ?></div>
                     </td>
                     <td style="width: 50%; text-align: right;">
-                        <div class="sig-line" style="display: inline-block;">Customer Signature</div>
+                        <div class="sig-line" style="display: inline-block;">SIGNATURE</div>
                     </td>
                 </tr>
             </table>
