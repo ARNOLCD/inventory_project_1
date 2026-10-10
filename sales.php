@@ -164,6 +164,16 @@ $sales = $conn->query("
 // Get totals
 $totals = $conn->query("SELECT COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN total_amount END), 0) as total, COUNT(*) as count FROM sales s $where")->fetch_assoc();
 
+// Sales monitored per day / week / month / year (paid sales)
+$week_ago = "DATE_SUB(CURDATE(), INTERVAL 7 DAY)";
+$month_start = "DATE_FORMAT(CURDATE(), '%Y-%m-01')";
+$period_sales = $conn->query("SELECT
+    SUM(sale_date >= CURDATE()) AS today_c, COALESCE(SUM(CASE WHEN sale_date >= CURDATE() THEN total_amount END), 0) AS today,
+    SUM(sale_date >= $week_ago) AS week_c, COALESCE(SUM(CASE WHEN sale_date >= $week_ago THEN total_amount END), 0) AS week,
+    SUM(sale_date >= $month_start) AS month_c, COALESCE(SUM(CASE WHEN sale_date >= $month_start THEN total_amount END), 0) AS month,
+    SUM(YEAR(sale_date) = YEAR(CURDATE())) AS year_c, COALESCE(SUM(CASE WHEN YEAR(sale_date) = YEAR(CURDATE()) THEN total_amount END), 0) AS year
+    FROM sales WHERE payment_status = 'paid'")->fetch_assoc();
+
 // Get employees for filter
 $employees = $conn->query("SELECT id, full_name FROM users ORDER BY full_name ASC");
 ?>
@@ -219,7 +229,47 @@ $employees = $conn->query("SELECT id, full_name FROM users ORDER BY full_name AS
                         </div>
                     </div>
                 </div>
-                
+
+                <!-- Period monitoring -->
+                <div class="stats-grid mb-4">
+                    <div class="stat-card">
+                        <div class="stat-icon blue">
+                            <i class="fas fa-calendar-day"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3>K<?php echo number_format($period_sales['today'], 2); ?></h3>
+                            <p>Today - <?php echo (int)$period_sales['today_c']; ?> sale<?php echo $period_sales['today_c'] == 1 ? '' : 's'; ?></p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon green">
+                            <i class="fas fa-calendar-week"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3>K<?php echo number_format($period_sales['week'], 2); ?></h3>
+                            <p>This Week - <?php echo (int)$period_sales['week_c']; ?> sales</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon purple">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3>K<?php echo number_format($period_sales['month'], 2); ?></h3>
+                            <p>This Month - <?php echo (int)$period_sales['month_c']; ?> sales</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon orange">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3>K<?php echo number_format($period_sales['year'], 2); ?></h3>
+                            <p>This Year - <?php echo (int)$period_sales['year_c']; ?> sales</p>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Filters -->
                 <div class="card mb-4">
                     <div class="card-body">
@@ -315,7 +365,7 @@ $employees = $conn->query("SELECT id, full_name FROM users ORDER BY full_name AS
                                                                     <option value="<?php echo $method; ?>"><?php echo e($label); ?></option>
                                                                 <?php endforeach; ?>
                                                             </select>
-                                                            <button type="submit" name="mark_paid" value="1" class="action-btn" style="background: #38a169; color: #fff;" title="Mark paid &amp; issue receipt"><i class="fas fa-check"></i></button>
+                                                            <button type="submit" name="mark_paid" value="1" class="action-btn" style="background: #38a169; color: #fff; padding: 5px 12px;" title="Mark paid &amp; issue receipt"><i class="fas fa-check-circle"></i> Paid</button>
                                                         </form>
                                                     <?php else: ?>
                                                         <a class="action-btn" href="receipt.php?source=sale&amp;id=<?php echo $sale['id']; ?>" target="_blank" title="View / print receipt" style="background: #38a169; color: #fff;"><i class="fas fa-receipt"></i></a>

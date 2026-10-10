@@ -1,6 +1,7 @@
 <?php
 require_once 'config/database.php';
 require_once 'config/session.php';
+require_once 'config/email.php';
 requireLogin();
 
 $user = getCurrentUser();
@@ -8,6 +9,21 @@ $user = getCurrentUser();
 // Only customers can access this page
 if (!isCustomer()) {
     header('Location: dashboard.php');
+    exit();
+}
+
+// Customer marks their booked item as being on its way to the office
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'send_to_office') {
+    $rid = (int)($_POST['repair_id'] ?? 0);
+    $stmt = $conn->prepare("UPDATE repairs SET status = 'in_transit_to_office', in_transit_to_office_date = NOW(),
+                            repair_notes = CONCAT(IFNULL(repair_notes, ''), '\n[" . date('Y-m-d H:i') . "] Customer marked the item as in transit to the office')
+                            WHERE id = ? AND customer_id = ? AND status = 'booked'");
+    $stmt->bind_param("ii", $rid, $user['id']);
+    $stmt->execute();
+    if ($stmt->affected_rows === 1) {
+        notifyStaffItemInTransitToOffice($conn, $rid);
+    }
+    header('Location: customer_dashboard.php');
     exit();
 }
 
@@ -185,6 +201,8 @@ $cart_count = 0; // This would be dynamic in a real implementation
             font-weight: 500;
         }
         .status-booked { background: #3182ce; color: white; }
+        .status-failed { background: #b91c1c; color: white; }
+        .status-in_transit_to_office { background: #2b6cb0; color: white; }
         .status-item_received { background: #4299e1; color: white; }
         .status-in_progress { background: #dd6b20; color: white; }
         .status-completed { background: #38a169; color: white; }
@@ -215,11 +233,13 @@ $cart_count = 0; // This would be dynamic in a real implementation
         .progress-fill.pending_approval { width: 5%; background: #718096; }
         .progress-fill.rejected { width: 100%; background: #c53030; }
         .progress-fill.booked { width: 20%; background: #3182ce; }
+        .progress-fill.in_transit_to_office { width: 30%; background: #2b6cb0; }
         .progress-fill.item_received { width: 40%; background: #4299e1; }
         .progress-fill.in_progress { width: 60%; background: #dd6b20; }
         .progress-fill.completed { width: 80%; background: #38a169; }
         .progress-fill.in_transit { width: 90%; background: #9f7aea; }
         .progress-fill.delivered { width: 100%; background: #805ad5; }
+        .progress-fill.failed { width: 100%; background: #b91c1c; }
         .no-repairs {
             text-align: center;
             padding: 40px;
@@ -319,7 +339,7 @@ $cart_count = 0; // This would be dynamic in a real implementation
             <?php if ($repairs->num_rows > 0): ?>
                 <?php while ($repair = $repairs->fetch_assoc()): ?>
                     <?php
-                    $status_labels = ['pending_approval' => 'Awaiting approval', 'rejected' => 'Declined'];
+                    $status_labels = ['pending_approval' => 'Awaiting approval', 'rejected' => 'Declined', 'failed' => 'Repair unsuccessful', 'in_transit_to_office' => 'On its way to our office', 'in_transit' => 'On its way to you'];
                     $is_request_open = !in_array($repair['status'], ['pending_approval', 'rejected'], true);
                     ?>
                     <div class="repair-card">
@@ -349,11 +369,31 @@ $cart_count = 0; // This would be dynamic in a real implementation
                                     Reason: <?php echo nl2br(htmlspecialchars($repair['rejection_reason'])); ?>
                                 <?php endif; ?>
                             </div>
+                        <?php elseif ($repair['status'] === 'failed'): ?>
+                            <div style="background: #fff5f5; border: 1px solid #feb2b2; border-radius: 8px; padding: 12px; margin: 10px 0; color: #b91c1c; font-size: 0.9rem;">
+                                <i class="fas fa-exclamation-triangle"></i> <strong>Unfortunately we were unable to repair this device.</strong>
+                                Please contact us to arrange collection or discuss options.
+                            </div>
                         <?php endif; ?>
 
                         <div class="progress-bar">
                             <div class="progress-fill <?php echo $repair['status']; ?>"></div>
                         </div>
+
+                        <?php if ($repair['status'] === 'booked'): ?>
+                            <div style="margin: 12px 0; background: #ebf8ff; border: 1px solid #90cdf4; border-radius: 8px; padding: 12px;">
+                                <p style="margin: 0 0 10px; font-size: 0.9rem; color: #2b6cb0;"><i class="fas fa-info-circle"></i> Repair approved. When you send or bring the device to our office, let us know it is on the way:</p>
+                                <form method="POST" style="margin: 0;" onsubmit="return confirm('Confirm the item is on its way to the office?');">
+                                    <input type="hidden" name="action" value="send_to_office">
+                                    <input type="hidden" name="repair_id" value="<?php echo (int)$repair['id']; ?>">
+                                    <button type="submit" class="btn btn-primary"><i class="fas fa-truck"></i> My Item Is On Its Way to the Office</button>
+                                </form>
+                            </div>
+                        <?php elseif ($repair['status'] === 'in_transit_to_office'): ?>
+                            <div style="margin: 12px 0; background: #ebf8ff; border: 1px solid #90cdf4; border-radius: 8px; padding: 12px; font-size: 0.9rem; color: #2b6cb0;">
+                                <i class="fas fa-truck"></i> Your item is on its way to our office<?php echo $repair['in_transit_to_office_date'] ? ' (' . date('M d, Y H:i', strtotime($repair['in_transit_to_office_date'])) . ')' : ''; ?>. We will update you once it is received.
+                            </div>
+                        <?php endif; ?>
 
                         <div class="repair-details">
                             <p><strong>Problem:</strong> <?php echo htmlspecialchars($repair['problem_description']); ?></p>
@@ -366,6 +406,9 @@ $cart_count = 0; // This would be dynamic in a real implementation
                             <?php endif; ?>
                             <?php if ($repair['final_cost']): ?>
                                 <p><strong>Final Cost:</strong> K<?php echo number_format($repair['final_cost'], 2); ?></p>
+                            <?php endif; ?>
+                            <?php if (!empty($repair['parts_replaced'])): ?>
+                                <p><strong><i class="fas fa-cogs"></i> Parts Replaced:</strong> <?php echo nl2br(htmlspecialchars($repair['parts_replaced'])); ?></p>
                             <?php endif; ?>
                             <?php if ($repair['payment_status'] && $is_request_open): ?>
                                 <p><strong>Payment Status:</strong>
@@ -391,7 +434,14 @@ $cart_count = 0; // This would be dynamic in a real implementation
                                             Waiting for item to be received at Sims-Tech
                                         </div>
                                     <?php endif; ?>
-                                    
+
+                                    <?php if ($repair['in_transit_to_office_date']): ?>
+                                        <div style="margin-bottom: 5px;">
+                                            <i class="fas fa-truck" style="color: #2b6cb0;"></i>
+                                            Item on its way to our office: <?php echo date('M d, Y H:i', strtotime($repair['in_transit_to_office_date'])); ?>
+                                        </div>
+                                    <?php endif; ?>
+
                                     <?php if ($repair['completed_date']): ?>
                                         <div style="margin-bottom: 5px;">
                                             <i class="fas fa-check-circle" style="color: #38a169;"></i>

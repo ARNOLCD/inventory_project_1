@@ -3,7 +3,7 @@
 // runMigrations() compares the stored schema_version with SCHEMA_VERSION and only
 // does work when the code is newer than the database.
 
-define('SCHEMA_VERSION', 2);
+define('SCHEMA_VERSION', 4);
 
 function runMigrations($conn) {
     if ((int)getSetting('schema_version', 0) >= SCHEMA_VERSION) {
@@ -24,6 +24,12 @@ function runMigrations($conn) {
         }
         if ($ok && $current < 2) {
             $ok = migrateToV2($conn);
+        }
+        if ($ok && $current < 3) {
+            $ok = migrateToV3($conn);
+        }
+        if ($ok && $current < 4) {
+            $ok = migrateToV4($conn);
         }
         if ($ok) {
             $conn->query("INSERT INTO system_settings (setting_key, setting_value) VALUES ('schema_version', '" . SCHEMA_VERSION . "')
@@ -61,7 +67,7 @@ function runMigrationStatements($conn, array $statements) {
 }
 
 function migrateToV1($conn) {
-    $repair_statuses = "'pending_approval', 'booked', 'item_received', 'in_progress', 'completed', 'in_transit', 'delivered', 'cancelled', 'rejected'";
+    $repair_statuses = "'pending_approval', 'booked', 'in_transit_to_office', 'item_received', 'in_progress', 'completed', 'in_transit', 'delivered', 'failed', 'cancelled', 'rejected'";
 
     $ok = runMigrationStatements($conn, [
         "CREATE TABLE IF NOT EXISTS system_settings (
@@ -213,5 +219,24 @@ function migrateToV1($conn) {
 function migrateToV2($conn) {
     return runMigrationStatements($conn, [
         "ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'employee', 'technician', 'sales', 'customer') DEFAULT 'customer'",
+    ]);
+}
+
+// Customers can mark their booked item as on its way to the office before it is received
+function migrateToV3($conn) {
+    $repair_statuses = "'pending_approval', 'booked', 'in_transit_to_office', 'item_received', 'in_progress', 'completed', 'in_transit', 'delivered', 'cancelled', 'rejected'";
+    return runMigrationStatements($conn, [
+        "ALTER TABLE repairs MODIFY COLUMN status ENUM($repair_statuses) DEFAULT 'booked'",
+        "ALTER TABLE repairs ADD COLUMN IF NOT EXISTS in_transit_to_office_date DATETIME DEFAULT NULL AFTER received_date",
+    ]);
+}
+
+// Repairs can fail (technician could not fix the device) and technicians record spare parts replaced
+function migrateToV4($conn) {
+    $repair_statuses = "'pending_approval', 'booked', 'in_transit_to_office', 'item_received', 'in_progress', 'completed', 'in_transit', 'delivered', 'failed', 'cancelled', 'rejected'";
+    return runMigrationStatements($conn, [
+        "ALTER TABLE repairs MODIFY COLUMN status ENUM($repair_statuses) DEFAULT 'booked'",
+        "ALTER TABLE repairs ADD COLUMN IF NOT EXISTS failed_date DATETIME DEFAULT NULL",
+        "ALTER TABLE repairs ADD COLUMN IF NOT EXISTS parts_replaced TEXT DEFAULT NULL",
     ]);
 }

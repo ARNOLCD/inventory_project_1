@@ -67,7 +67,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Update status and set appropriate date
         $date_field = '';
-        if ($new_status === 'item_received') {
+        if ($new_status === 'in_transit_to_office') {
+            $date_field = ", in_transit_to_office_date = NOW()";
+        } elseif ($new_status === 'item_received') {
             $date_field = ", item_received_date = NOW()";
         } elseif ($new_status === 'in_progress') {
             $date_field = ", started_date = NOW()";
@@ -77,6 +79,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $date_field = ", in_transit_date = NOW()";
         } elseif ($new_status === 'delivered') {
             $date_field = ", delivered_date = NOW()";
+        } elseif ($new_status === 'failed') {
+            $date_field = ", failed_date = NOW()";
         }
 
         $sql = "UPDATE repairs SET status = ?, repair_notes = CONCAT(IFNULL(repair_notes, ''), '\n[" . date('Y-m-d H:i') . "] Status: $new_status - ', ?) $date_field WHERE id = ?";
@@ -100,6 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $device_model = trim($_POST['device_model']);
         $problem_description = trim($_POST['problem_description']);
         $diagnosis = trim($_POST['diagnosis']);
+        $parts_replaced = trim($_POST['parts_replaced'] ?? '');
         $estimated_cost = floatval($_POST['estimated_cost'] ?? 0);
         $final_cost = floatval($_POST['final_cost'] ?? 0);
         $priority = $_POST['priority'];
@@ -129,17 +134,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         if ($photo_sql) {
-            $stmt = $conn->prepare("UPDATE repairs SET customer_name=?, customer_phone=?, device_type=?, device_brand=?, device_model=?, problem_description=?, diagnosis=?, estimated_cost=?, final_cost=?, priority=?, technician_id=?, customer_id=?" . $photo_sql . " WHERE id=?");
-            $stmt->bind_param("sssssssddsiii" . $photo_param . "i", $customer_name, $customer_phone, $device_type, $device_brand, $device_model, $problem_description, $diagnosis, $estimated_cost, $final_cost, $priority, $technician_id, $customer_id, $item_photo, $id);
+            $stmt = $conn->prepare("UPDATE repairs SET customer_name=?, customer_phone=?, device_type=?, device_brand=?, device_model=?, problem_description=?, diagnosis=?, parts_replaced=?, estimated_cost=?, final_cost=?, priority=?, technician_id=?, customer_id=?" . $photo_sql . " WHERE id=?");
+            $stmt->bind_param("ssssssssddsiii" . $photo_param . "i", $customer_name, $customer_phone, $device_type, $device_brand, $device_model, $problem_description, $diagnosis, $parts_replaced, $estimated_cost, $final_cost, $priority, $technician_id, $customer_id, $item_photo, $id);
         } else {
-            $stmt = $conn->prepare("UPDATE repairs SET customer_name=?, customer_phone=?, device_type=?, device_brand=?, device_model=?, problem_description=?, diagnosis=?, estimated_cost=?, final_cost=?, priority=?, technician_id=?, customer_id=? WHERE id=?");
-            $stmt->bind_param("sssssssddsiii", $customer_name, $customer_phone, $device_type, $device_brand, $device_model, $problem_description, $diagnosis, $estimated_cost, $final_cost, $priority, $technician_id, $customer_id, $id);
+            $stmt = $conn->prepare("UPDATE repairs SET customer_name=?, customer_phone=?, device_type=?, device_brand=?, device_model=?, problem_description=?, diagnosis=?, parts_replaced=?, estimated_cost=?, final_cost=?, priority=?, technician_id=?, customer_id=? WHERE id=?");
+            $stmt->bind_param("ssssssssddsiii", $customer_name, $customer_phone, $device_type, $device_brand, $device_model, $problem_description, $diagnosis, $parts_replaced, $estimated_cost, $final_cost, $priority, $technician_id, $customer_id, $id);
         }
         
         if ($stmt->execute()) {
             $message = 'Repair updated successfully!';
         } else {
             $error = 'Error updating repair.';
+        }
+    } elseif ($action === 'notify_transit') {
+        // Staff explicitly emails the customer that their repaired item is on its way
+        $id = intval($_POST['id']);
+        if (notifyRepairCustomer($conn, $id, 'in_transit', 'Your repaired item is on its way to you.')) {
+            $message = 'The customer has been emailed that their item is on its way to them.';
+        } else {
+            $error = 'No valid customer email is on file for this repair.';
         }
     } elseif ($action === 'record_payment') {
         // Counter payment taken by staff: mark paid once, then issue + email the receipt
@@ -173,6 +186,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Get filter
 $status_filter = isset(REPAIR_STATUSES[$_GET['status'] ?? '']) ? $_GET['status'] : '';
 $technician_filter = $_GET['technician'] ?? '';
+$periods = ['today' => 'Today', 'week' => 'This Week', 'month' => 'This Month', 'year' => 'This Year'];
+$period_filter = isset($periods[$_GET['period'] ?? '']) ? $_GET['period'] : '';
 
 // Build query
 $where = "WHERE 1=1";
@@ -182,7 +197,18 @@ if ($status_filter) {
     // Pending customer requests are handled on repair_requests.php; declined/cancelled only show via their filter
     $where .= " AND r.status NOT IN ('pending_approval', 'rejected', 'cancelled')";
 }
-if ($technician_filter) {
+if ($period_filter === 'today') {
+    $where .= " AND r.created_at >= CURDATE()";
+} elseif ($period_filter === 'week') {
+    $where .= " AND YEARWEEK(r.created_at, 1) = YEARWEEK(CURDATE(), 1)";
+} elseif ($period_filter === 'month') {
+    $where .= " AND YEAR(r.created_at) = YEAR(CURDATE()) AND MONTH(r.created_at) = MONTH(r.created_at)";
+} elseif ($period_filter === 'year') {
+    $where .= " AND YEAR(r.created_at) = YEAR(CURDATE())";
+}
+if ($technician_filter === 'none') {
+    $where .= " AND (r.technician_id IS NULL OR r.technician_id = 0)";
+} elseif ($technician_filter) {
     $where .= " AND r.technician_id = " . intval($technician_filter);
 }
 
@@ -200,7 +226,7 @@ $repairs = $conn->query("
     LEFT JOIN users u3 ON r.customer_id = u3.id 
     $where
     ORDER BY
-        FIELD(r.status, 'booked', 'item_received', 'in_progress', 'completed', 'in_transit', 'delivered', 'pending_approval', 'rejected', 'cancelled'),
+        FIELD(r.status, 'booked', 'in_transit_to_office', 'item_received', 'in_progress', 'completed', 'in_transit', 'delivered', 'failed', 'pending_approval', 'rejected', 'cancelled'),
         CASE r.priority
             WHEN 'urgent' THEN 1
             WHEN 'high' THEN 2
@@ -212,6 +238,80 @@ $repairs = $conn->query("
 
 // Get counts
 $status_counts = repairStatusCounts($conn);
+
+// Status counts per time period (day / week / month / year) for the tracking summary
+$period_counts = [];
+$period_totals = ['today' => 0, 'week' => 0, 'month' => 0, 'year' => 0, 'all_time' => 0];
+foreach ($conn->query("
+    SELECT status,
+           SUM(created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY) AS today,
+           SUM(YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1)) AS week,
+           SUM(YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())) AS month,
+           SUM(YEAR(created_at) = YEAR(CURDATE())) AS year,
+           COUNT(*) AS all_time
+    FROM repairs
+    GROUP BY status
+") as $row) {
+    $period_counts[$row['status']] = $row;
+    foreach ($period_totals as $p => &$t) {
+        $t += (int)$row[$p];
+    }
+}
+unset($t);
+
+// Repairs assigned to each technician, broken down per status
+$tech_breakdown = [];
+foreach ($conn->query("
+    SELECT r.technician_id, COALESCE(u.full_name, 'Unassigned') AS tech, r.status, COUNT(*) AS c
+    FROM repairs r LEFT JOIN users u ON r.technician_id = u.id
+    GROUP BY r.technician_id, r.status
+") as $row) {
+    $name = $row['tech'];
+    $tech_breakdown[$name]['id'] = $row['technician_id'];
+    $tech_breakdown[$name][$row['status']] = (int)$row['c'];
+    $tech_breakdown[$name]['total'] = ($tech_breakdown[$name]['total'] ?? 0) + (int)$row['c'];
+}
+uasort($tech_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
+
+// Items repaired (completed) tracked per day / week / month / year
+$repaired_totals = $conn->query("
+    SELECT
+        SUM(completed_date >= CURDATE() AND completed_date < CURDATE() + INTERVAL 1 DAY) AS today,
+        SUM(YEARWEEK(completed_date, 1) = YEARWEEK(CURDATE(), 1)) AS week,
+        SUM(YEAR(completed_date) = YEAR(CURDATE()) AND MONTH(completed_date) = MONTH(completed_date)) AS month,
+        SUM(YEAR(completed_date) = YEAR(CURDATE())) AS year,
+        COUNT(*) AS all_time
+    FROM repairs WHERE completed_date IS NOT NULL
+")->fetch_assoc();
+
+// Per day within this week
+$repaired_days = $conn->query("
+    SELECT DATE(completed_date) AS d, COUNT(*) AS c
+    FROM repairs
+    WHERE completed_date IS NOT NULL
+      AND YEARWEEK(completed_date, 1) = YEARWEEK(CURDATE(), 1)
+    GROUP BY d ORDER BY d");
+
+// Per week within this month
+$repaired_weeks = $conn->query("
+    SELECT YEARWEEK(completed_date, 1) AS wk, MIN(DATE(completed_date)) AS start_date, COUNT(*) AS c
+    FROM repairs
+    WHERE completed_date IS NOT NULL
+      AND YEAR(completed_date) = YEAR(CURDATE()) AND MONTH(completed_date) = MONTH(CURDATE())
+    GROUP BY wk ORDER BY wk");
+
+// Per month within this year
+$repaired_months = $conn->query("
+    SELECT MONTH(completed_date) AS m, COUNT(*) AS c
+    FROM repairs
+    WHERE completed_date IS NOT NULL AND YEAR(completed_date) = YEAR(CURDATE())
+    GROUP BY m ORDER BY m");
+
+// Per year, all time
+$repaired_years = $conn->query("
+    SELECT YEAR(completed_date) AS y, COUNT(*) AS c
+    FROM repairs WHERE completed_date IS NOT NULL
+    GROUP BY y ORDER BY y DESC");
 
 // Get technicians for dropdown
 $technicians = $conn->query("SELECT id, full_name FROM users WHERE role IN ('" . implode("','", STAFF_ROLES) . "') ORDER BY full_name");
@@ -231,11 +331,13 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
     <style>
         body { font-family: 'Poppins', sans-serif; }
         .status-booked { background: #3182ce; color: white; }
+        .status-in_transit_to_office { background: #2b6cb0; color: white; }
         .status-item_received { background: #4299e1; color: white; }
         .status-in_progress { background: #dd6b20; color: white; }
         .status-completed { background: #38a169; color: white; }
         .status-in_transit { background: #9f7aea; color: white; }
         .status-delivered { background: #805ad5; color: white; }
+        .status-failed { background: #b91c1c; color: white; }
         .status-cancelled { background: #e53e3e; color: white; }
         .repair-categories { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 15px; }
         .repair-category {
@@ -370,6 +472,20 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
         .step-line { flex: 1; height: 3px; background: #edf2f7; margin-top: 22px; border-radius: 2px; min-width: 12px; }
         .step-line.done { background: #c6f6d5; }
         .repair-badge { padding: 8px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
+
+        /* Tracking summary tables (status x period, technician x status) */
+        .summary-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .summary-table th { background: #f7fafc; color: #4a5568; padding: 8px 10px; text-align: center; border-bottom: 2px solid #e2e8f0; white-space: nowrap; font-size: 0.78rem; }
+        .summary-table th:first-child, .summary-table td:first-child { text-align: left; }
+        .summary-table td { padding: 7px 10px; text-align: center; border-bottom: 1px solid #edf2f7; }
+        .summary-table tbody tr:hover { background: #f7fafc; }
+        .summary-table .summary-total td { border-top: 2px solid #cbd5e0; background: #f7fafc; }
+        .summary-table a { text-decoration: none; font-weight: 600; color: #1a365d; }
+        .summary-table a:hover { text-decoration: underline; }
+        .summary-table .zero { color: #cbd5e0; }
+        .rep-counter { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 18px; text-align: center; min-width: 90px; }
+        .rep-counter .rep-num { font-size: 1.4rem; font-weight: 700; color: #38a169; }
+        .rep-counter .rep-lbl { font-size: 0.75rem; color: #718096; }
     </style>
 </head>
 <body>
@@ -412,18 +528,170 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
                     <?php endforeach; ?>
                 </div>
                 
+                <!-- Tracking summary: repairs per status for each time period -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h3 style="margin: 0 0 12px; font-size: 1.05rem;"><i class="fas fa-chart-bar"></i> Tracking Summary</h3>
+                        <div style="overflow-x: auto;">
+                            <table class="summary-table">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Today</th>
+                                        <th>This Week</th>
+                                        <th>This Month</th>
+                                        <th>This Year</th>
+                                        <th>All Time</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach (REPAIR_STATUSES as $s_key => $s_label):
+                                        [$s_icon, $s_color] = REPAIR_STATUS_STYLES[$s_key]; ?>
+                                        <tr>
+                                            <td><i class="fas <?php echo $s_icon; ?>" style="color: <?php echo $s_color; ?>;"></i> <?php echo e($s_label); ?></td>
+                                            <?php foreach (['today', 'week', 'month', 'year', 'all_time'] as $p):
+                                                $n = (int)($period_counts[$s_key][$p] ?? 0); ?>
+                                                <td>
+                                                    <?php if ($n > 0 && $p !== 'all_time'): ?>
+                                                        <a href="repairs.php?status=<?php echo $s_key; ?>&period=<?php echo $p; ?>"><?php echo $n; ?></a>
+                                                    <?php elseif ($n > 0): ?>
+                                                        <a href="repairs.php?status=<?php echo $s_key; ?>"><?php echo $n; ?></a>
+                                                    <?php else: ?>
+                                                        <span class="zero">0</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                            <?php endforeach; ?>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                    <tr class="summary-total">
+                                        <td><strong>Total</strong></td>
+                                        <?php foreach (['today', 'week', 'month', 'year', 'all_time'] as $p): ?>
+                                            <td><strong><?php echo $period_totals[$p]; ?></strong></td>
+                                        <?php endforeach; ?>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <h4 style="margin: 20px 0 10px; font-size: 0.95rem;"><i class="fas fa-user-cog"></i> Repairs by Technician</h4>
+                        <div style="overflow-x: auto;">
+                            <table class="summary-table">
+                                <thead>
+                                    <tr>
+                                        <th>Technician</th>
+                                        <?php foreach (['booked', 'in_transit_to_office', 'item_received', 'in_progress', 'completed', 'in_transit', 'delivered', 'failed'] as $s_key): ?>
+                                            <th title="<?php echo e(REPAIR_STATUSES[$s_key]); ?>"><i class="fas <?php echo REPAIR_STATUS_STYLES[$s_key][0]; ?>" style="color: <?php echo REPAIR_STATUS_STYLES[$s_key][1]; ?>;"></i></th>
+                                        <?php endforeach; ?>
+                                        <th>Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if ($tech_breakdown): ?>
+                                        <?php foreach ($tech_breakdown as $name => $data): ?>
+                                            <tr>
+                                                <td>
+                                                    <?php if ($data['id']): ?>
+                                                        <a href="repairs.php?technician=<?php echo (int)$data['id']; ?>"><?php echo e($name); ?></a>
+                                                    <?php else: ?>
+                                                        <a href="repairs.php?technician=none" style="color: #718096; font-style: italic;"><?php echo e($name); ?></a>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <?php foreach (['booked', 'in_transit_to_office', 'item_received', 'in_progress', 'completed', 'in_transit', 'delivered', 'failed'] as $s_key):
+                                                    $n = (int)($data[$s_key] ?? 0); ?>
+                                                    <td><?php echo $n > 0 ? '<strong>' . $n . '</strong>' : '<span class="zero">0</span>'; ?></td>
+                                                <?php endforeach; ?>
+                                                <td><strong><?php echo (int)$data['total']; ?></strong></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <tr><td colspan="10" style="text-align: center; color: #718096;">No repairs assigned yet</td></tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <h4 style="margin: 20px 0 10px; font-size: 0.95rem;"><i class="fas fa-check-circle"></i> Items Repaired (by date completed)</h4>
+                        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 15px;">
+                            <div class="rep-counter"><div class="rep-num"><?php echo (int)$repaired_totals['today']; ?></div><div class="rep-lbl">Today</div></div>
+                            <div class="rep-counter"><div class="rep-num"><?php echo (int)$repaired_totals['week']; ?></div><div class="rep-lbl">This Week</div></div>
+                            <div class="rep-counter"><div class="rep-num"><?php echo (int)$repaired_totals['month']; ?></div><div class="rep-lbl">This Month</div></div>
+                            <div class="rep-counter"><div class="rep-num"><?php echo (int)$repaired_totals['year']; ?></div><div class="rep-lbl">This Year</div></div>
+                            <div class="rep-counter"><div class="rep-num"><?php echo (int)$repaired_totals['all_time']; ?></div><div class="rep-lbl">All Time</div></div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 15px;">
+                            <table class="summary-table">
+                                <thead><tr><th colspan="2" style="text-align: left;">This Week - by day</th></tr></thead>
+                                <tbody>
+                                    <?php if ($repaired_days->num_rows): ?>
+                                        <?php while ($r = $repaired_days->fetch_assoc()): ?>
+                                            <tr><td><?php echo date('D j M', strtotime($r['d'])); ?></td><td><strong><?php echo (int)$r['c']; ?></strong></td></tr>
+                                        <?php endwhile; ?>
+                                    <?php else: ?>
+                                        <tr><td colspan="2" style="text-align: left; color: #a0aec0;">None repaired this week</td></tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                            <table class="summary-table">
+                                <thead><tr><th colspan="2" style="text-align: left;">This Month - by week</th></tr></thead>
+                                <tbody>
+                                    <?php if ($repaired_weeks->num_rows): ?>
+                                        <?php while ($r = $repaired_weeks->fetch_assoc()): ?>
+                                            <tr><td>Week of <?php echo date('j M', strtotime($r['start_date'])); ?></td><td><strong><?php echo (int)$r['c']; ?></strong></td></tr>
+                                        <?php endwhile; ?>
+                                    <?php else: ?>
+                                        <tr><td colspan="2" style="text-align: left; color: #a0aec0;">None repaired this month</td></tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                            <table class="summary-table">
+                                <thead><tr><th colspan="2" style="text-align: left;">This Year - by month</th></tr></thead>
+                                <tbody>
+                                    <?php if ($repaired_months->num_rows): ?>
+                                        <?php while ($r = $repaired_months->fetch_assoc()): ?>
+                                            <tr><td><?php echo date('F', mktime(0, 0, 0, (int)$r['m'], 1)); ?></td><td><strong><?php echo (int)$r['c']; ?></strong></td></tr>
+                                        <?php endwhile; ?>
+                                    <?php else: ?>
+                                        <tr><td colspan="2" style="text-align: left; color: #a0aec0;">None repaired this year</td></tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                            <table class="summary-table">
+                                <thead><tr><th colspan="2" style="text-align: left;">All Time - by year</th></tr></thead>
+                                <tbody>
+                                    <?php if ($repaired_years->num_rows): ?>
+                                        <?php while ($r = $repaired_years->fetch_assoc()): ?>
+                                            <tr><td><?php echo (int)$r['y']; ?></td><td><strong><?php echo (int)$r['c']; ?></strong></td></tr>
+                                        <?php endwhile; ?>
+                                    <?php else: ?>
+                                        <tr><td colspan="2" style="text-align: left; color: #a0aec0;">No repairs completed yet</td></tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Filters -->
                 <div class="card mb-4">
                     <div class="card-body" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
-                        <a href="repairs.php" class="btn <?php echo !$status_filter && !$technician_filter ? 'btn-primary' : 'btn-secondary'; ?> btn-sm">All active</a>
-                        <?php if ($status_filter): ?>
-                            <span class="badge" style="background: <?php echo REPAIR_STATUS_STYLES[$status_filter][1]; ?>; color: #fff; padding: 6px 12px;">Showing: <?php echo e(repairStatusLabel($status_filter)); ?></span>
+                        <a href="repairs.php" class="btn <?php echo !$status_filter && !$technician_filter && !$period_filter ? 'btn-primary' : 'btn-secondary'; ?> btn-sm">All active</a>
+                        <?php foreach ($periods as $p_key => $p_label): ?>
+                            <a href="repairs.php?period=<?php echo $p_key; ?><?php echo $status_filter ? '&status=' . $status_filter : ''; ?><?php echo $technician_filter ? '&technician=' . urlencode($technician_filter) : ''; ?>"
+                               class="btn <?php echo $period_filter === $p_key ? 'btn-primary' : 'btn-secondary'; ?> btn-sm">
+                                <i class="fas fa-calendar-alt"></i> <?php echo $p_label; ?>
+                            </a>
+                        <?php endforeach; ?>
+                        <?php if ($status_filter || $period_filter): ?>
+                            <span class="badge" style="background: <?php echo $status_filter ? REPAIR_STATUS_STYLES[$status_filter][1] : '#1a365d'; ?>; color: #fff; padding: 6px 12px;">
+                                Showing: <?php echo e(implode(' / ', array_filter([$status_filter ? repairStatusLabel($status_filter) : '', $periods[$period_filter] ?? '']))); ?>
+                            </span>
                         <?php endif; ?>
-                        
+
                         <div style="display: flex; align-items: center; gap: 8px; margin-left: 10px;">
                             <label style="font-size: 0.9rem; color: #4a5568;"><i class="fas fa-user-cog"></i> Technician:</label>
                             <select class="form-control" style="width: 180px; padding: 5px 10px; font-size: 0.85rem;" onchange="filterByTechnician(this.value)">
                                 <option value="">All Technicians</option>
+                                <option value="none" <?php echo $technician_filter === 'none' ? 'selected' : ''; ?>>Unassigned</option>
                                 <?php 
                                 $technicians->data_seek(0);
                                 while ($tech = $technicians->fetch_assoc()): 
@@ -512,12 +780,18 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
                                     </div>
                                 <?php endif; ?>
 
+                                <?php if (!empty($repair['parts_replaced'])): ?>
+                                    <div style="font-size: 0.85rem; color: #4a5568; margin-bottom: 10px; background: #fffaf0; border: 1px solid #fbd38d; border-radius: 6px; padding: 8px 10px;">
+                                        <strong><i class="fas fa-cogs"></i> Parts Replaced:</strong> <?php echo nl2br(htmlspecialchars($repair['parts_replaced'])); ?>
+                                    </div>
+                                <?php endif; ?>
+
                                 <!-- Workflow tracker: symbols show the stage clearly without clicking anything -->
                                 <?php
-                                $status_order = ['booked', 'item_received', 'in_progress', 'completed', 'in_transit', 'delivered'];
+                                $status_order = ['booked', 'in_transit_to_office', 'item_received', 'in_progress', 'completed', 'in_transit', 'delivered'];
                                 $current_pos = array_search($repair['status'], $status_order, true);
                                 $current_pos = $current_pos === false ? -1 : $current_pos;
-                                $workflow_steps = ['item_received' => 'Received', 'in_progress' => 'Working', 'completed' => 'Done', 'in_transit' => 'Transit', 'delivered' => 'Delivered'];
+                                $workflow_steps = ['in_transit_to_office' => 'To Office', 'item_received' => 'Received', 'in_progress' => 'Working', 'completed' => 'Done', 'in_transit' => 'To Client', 'delivered' => 'Delivered'];
                                 ?>
                                 <div class="repair-steps">
                                     <?php foreach ($workflow_steps as $step => $step_label):
@@ -560,7 +834,7 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
                                     <?php endif; ?>
                                     
                                     <div class="repair-actions">
-                                        <?php if ($repair['status'] === 'booked'): ?>
+                                        <?php if (in_array($repair['status'], ['booked', 'in_transit_to_office'], true)): ?>
                                             <button class="status-btn btn-receive" title="Mark that the device has arrived at the workshop" onclick="updateStatus(<?php echo $repair['id']; ?>, 'item_received')">
                                                 <i class="fas fa-box"></i> Item Received
                                             </button>
@@ -572,9 +846,16 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
                                             <button class="status-btn btn-complete" title="Repair work is finished" onclick="updateStatus(<?php echo $repair['id']; ?>, 'completed')">
                                                 <i class="fas fa-check"></i> Mark Complete
                                             </button>
+                                            <button class="status-btn" style="background: #b91c1c; color: #fff;" title="The device could not be fixed" onclick="updateStatus(<?php echo $repair['id']; ?>, 'failed')">
+                                                <i class="fas fa-exclamation-triangle"></i> Repair Failed
+                                            </button>
+                                        <?php elseif ($repair['status'] === 'failed'): ?>
+                                            <button class="status-btn btn-transit" title="Return the device to the client" onclick="updateStatus(<?php echo $repair['id']; ?>, 'in_transit')">
+                                                <i class="fas fa-shipping-fast"></i> Return to Client
+                                            </button>
                                         <?php elseif ($repair['status'] === 'completed'): ?>
-                                            <button class="status-btn btn-transit" title="Device is on its way back to the customer" onclick="updateStatus(<?php echo $repair['id']; ?>, 'in_transit')">
-                                                <i class="fas fa-shipping-fast"></i> Send to Transit
+                                            <button class="status-btn btn-transit" title="Mark as in transit to the client - the customer is emailed automatically" onclick="updateStatus(<?php echo $repair['id']; ?>, 'in_transit')">
+                                                <i class="fas fa-shipping-fast"></i> Send to Client
                                             </button>
                                         <?php elseif ($repair['status'] === 'in_transit'): ?>
                                             <button class="status-btn btn-deliver" title="Customer has received the device" onclick="updateStatus(<?php echo $repair['id']; ?>, 'delivered')">
@@ -582,9 +863,19 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
                                             </button>
                                         <?php endif; ?>
 
+                                        <?php if (in_array($repair['status'], ['completed', 'in_transit'], true)): ?>
+                                            <button class="status-btn" style="background: #2b6cb0; color: #fff;" title="Email the customer that their item is on its way to them" onclick="notifyTransit(<?php echo $repair['id']; ?>, '<?php echo htmlspecialchars($repair['ticket_number'], ENT_QUOTES); ?>')">
+                                                <i class="fas fa-envelope"></i> Email: On Its Way
+                                            </button>
+                                        <?php endif; ?>
+
                                         <?php if ($repair['final_cost'] > 0 && $repair['payment_status'] !== 'paid' && !in_array($repair['status'], ['pending_approval', 'rejected', 'cancelled'], true)): ?>
-                                            <button class="status-btn" style="background: #38a169; color: #fff;" onclick="recordPayment(<?php echo $repair['id']; ?>, '<?php echo e($repair['ticket_number']); ?>', '<?php echo number_format($repair['final_cost'], 2); ?>')">
-                                                <i class="fas fa-cash-register"></i> Record Payment
+                                            <button class="status-btn" style="background: #38a169; color: #fff;" title="Mark as paid - a receipt is generated and emailed automatically" onclick="recordPayment(<?php echo $repair['id']; ?>, '<?php echo e($repair['ticket_number']); ?>', '<?php echo number_format($repair['final_cost'], 2); ?>')">
+                                                <i class="fas fa-check-circle"></i> Mark Paid
+                                            </button>
+                                        <?php elseif ((!$repair['final_cost'] || $repair['final_cost'] <= 0) && $repair['payment_status'] !== 'paid' && !in_array($repair['status'], ['pending_approval', 'rejected', 'cancelled'], true)): ?>
+                                            <button class="status-btn" style="background: #a0aec0; color: #fff;" title="Set a final cost first (Edit), then the Mark Paid button appears" onclick="alert('Set the final cost for this repair first - click Edit and enter a Final Cost. Then use Mark Paid to issue the receipt.')">
+                                                <i class="fas fa-cash-register"></i> Paid
                                             </button>
                                         <?php elseif ($repair['payment_status'] === 'paid'): ?>
                                             <a class="action-btn" href="receipt.php?source=repair&amp;id=<?php echo $repair['id']; ?>" target="_blank" title="View / print receipt" style="background: #38a169; color: #fff;">
@@ -728,6 +1019,12 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
                         <label>Diagnosis</label>
                         <textarea name="diagnosis" id="diagnosis" class="form-control" rows="2" placeholder="Technical diagnosis..."></textarea>
                     </div>
+
+                    <div class="form-group" id="partsReplacedGroup" style="display: none;">
+                        <label><i class="fas fa-cogs"></i> Spare Parts Replaced</label>
+                        <textarea name="parts_replaced" id="partsReplaced" class="form-control" rows="2" placeholder="e.g., Screen assembly, Battery, HDD 1TB (leave blank if none)"></textarea>
+                        <small style="color: #718096;">Shown on the repair card so the team can see which parts were used.</small>
+                    </div>
                     
                     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
                         <div class="form-group">
@@ -789,7 +1086,7 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
     <div class="modal-overlay" id="paymentModal">
         <div class="modal" style="max-width: 400px;">
             <div class="modal-header">
-                <h3><i class="fas fa-cash-register"></i> Record Payment</h3>
+                <h3><i class="fas fa-check-circle"></i> Mark as Paid</h3>
                 <button class="modal-close" onclick="document.getElementById('paymentModal').classList.remove('active')">&times;</button>
             </div>
             <form method="POST">
@@ -809,7 +1106,7 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="document.getElementById('paymentModal').classList.remove('active')">Cancel</button>
-                    <button type="submit" class="btn btn-primary" style="background: #38a169;"><i class="fas fa-check"></i> Record Payment</button>
+                    <button type="submit" class="btn btn-primary" style="background: #38a169;"><i class="fas fa-check-circle"></i> Mark Paid</button>
                 </div>
             </form>
         </div>
@@ -820,6 +1117,12 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
         <input type="hidden" name="action" value="delete">
         <input type="hidden" name="id" id="deleteId">
     </form>
+
+    <!-- Transit notification form (emails the customer that the item is on its way) -->
+    <form id="notifyTransitForm" method="POST" style="display: none;">
+        <input type="hidden" name="action" value="notify_transit">
+        <input type="hidden" name="id" id="notifyTransitId">
+    </form>
     
     <script src="assets/js/main.js"></script>
     <script>
@@ -828,6 +1131,7 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
             document.getElementById('formAction').value = 'add';
             document.getElementById('repairForm').reset();
             document.getElementById('diagnosisGroup').style.display = 'none';
+            document.getElementById('partsReplacedGroup').style.display = 'none';
             document.getElementById('finalCostGroup').style.display = 'none';
             document.getElementById('technicianGroup').style.display = 'block';
             document.getElementById('customerGroup').style.display = 'block';
@@ -850,6 +1154,7 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
             document.getElementById('serialNumber').value = repair.serial_number || '';
             document.getElementById('problemDescription').value = repair.problem_description;
             document.getElementById('diagnosis').value = repair.diagnosis || '';
+            document.getElementById('partsReplaced').value = repair.parts_replaced || '';
             document.getElementById('estimatedCost').value = repair.estimated_cost || '';
             document.getElementById('finalCost').value = repair.final_cost || '';
             document.getElementById('priority').value = repair.priority;
@@ -857,6 +1162,7 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
             document.getElementById('customerId').value = repair.customer_id || '';
             
             document.getElementById('diagnosisGroup').style.display = 'block';
+            document.getElementById('partsReplacedGroup').style.display = 'block';
             document.getElementById('finalCostGroup').style.display = 'block';
             document.getElementById('technicianGroup').style.display = 'block';
             document.getElementById('customerGroup').style.display = 'block';
@@ -883,8 +1189,9 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
                 'item_received': 'Mark this item as received at Sims-Tech?',
                 'in_progress': 'Start working on this repair?',
                 'completed': 'Mark this repair as completed?',
-                'in_transit': 'Mark this item as in transit to customer?',
-                'delivered': 'Mark this device as delivered to customer?'
+                'in_transit': 'Mark this item as in transit to the client? The customer will be emailed automatically.',
+                'delivered': 'Mark this device as delivered to customer?',
+                'failed': 'Mark this repair as FAILED - the device could not be fixed? The customer will be emailed.'
             };
 
             document.getElementById('statusRepairId').value = id;
@@ -899,7 +1206,7 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
         
         function recordPayment(id, ticket, amount) {
             document.getElementById('paymentRepairId').value = id;
-            document.getElementById('paymentMessage').textContent = 'Record payment of K' + amount + ' for ticket ' + ticket + '?';
+            document.getElementById('paymentMessage').textContent = 'Mark payment of K' + amount + ' as received for ticket ' + ticket + '? A receipt will be generated and emailed automatically.';
             document.getElementById('paymentModal').classList.add('active');
         }
 
@@ -907,6 +1214,13 @@ $customers = $conn->query("SELECT id, full_name, email FROM users WHERE role = '
             if (confirm('Are you sure you want to delete repair ticket "' + ticket + '"?')) {
                 document.getElementById('deleteId').value = id;
                 document.getElementById('deleteForm').submit();
+            }
+        }
+
+        function notifyTransit(id, ticket) {
+            if (confirm('Email the customer that the item for ticket "' + ticket + '" is on its way to them?')) {
+                document.getElementById('notifyTransitId').value = id;
+                document.getElementById('notifyTransitForm').submit();
             }
         }
         

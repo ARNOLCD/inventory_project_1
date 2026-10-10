@@ -422,6 +422,7 @@ function sendRepairStatusEmail($customerEmail, $customerName, $ticketNumber, $st
         'completed' => ['Repair Completed', 'Your device repair has been completed successfully.', '#38a169'],
         'in_transit' => ['Device In Transit', 'Your repaired device is on its way back to you.', '#d69e2e'],
         'delivered' => ['Device Delivered', 'Your device has been delivered and is ready for pickup.', '#805ad5'],
+        'failed' => ['Repair Unsuccessful', 'Unfortunately we were unable to repair your device. Please contact us to arrange collection, or for a referral to a specialist.', '#b91c1c'],
         'cancelled' => ['Repair Cancelled', 'Your repair request has been cancelled.', '#e53e3e'],
     ];
     [$title, $text, $color] = $statusMessages[$status] ?? $statusMessages['booked'];
@@ -504,6 +505,30 @@ function notifyStaffOfRepairRequest($conn, $id) {
         </p>";
 
     queueEmailToStaff("New Repair Request - Ticket {$repair['ticket_number']}", emailLayout('New Repair Request Awaiting Review', 'Repair Requests', $content));
+}
+
+/**
+ * Email all internal users when a customer marks their item as on its way to the office
+ */
+function notifyStaffItemInTransitToOffice($conn, $id) {
+    $repair = getRepairForNotification($conn, $id);
+    if (!$repair || getSetting('repair_request_email_alerts', '1') !== '1') {
+        return;
+    }
+
+    $content = "
+        <p>A customer has marked their repair item as <strong>in transit to the office</strong>. Expect it to arrive soon.</p>
+        <div style='background: #fff; padding: 15px; border-radius: 5px; border: 1px solid #e2e8f0;'>
+            <p><strong>Ticket:</strong> " . e($repair['ticket_number']) . "</p>
+            <p><strong>Customer:</strong> " . e($repair['notify_name']) . "</p>
+            <p><strong>Phone:</strong> " . e($repair['customer_phone']) . "</p>
+            <p><strong>Device:</strong> " . e(getRepairDeviceInfo($repair)) . "</p>
+        </div>
+        <p style='text-align: center; margin-top: 20px;'>
+            <a href='" . e(SYSTEM_URL . '/repairs.php') . "' style='display: inline-block; background: #3182ce; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px;'>View Repair</a>
+        </p>";
+
+    queueEmailToStaff("Item In Transit to Office - Ticket {$repair['ticket_number']}", emailLayout('Item On Its Way to the Office', 'Repair Tracking', $content));
 }
 
 /**

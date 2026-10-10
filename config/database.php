@@ -27,11 +27,13 @@ runMigrations($conn);
 const REPAIR_STATUSES = [
     'pending_approval' => 'Pending Approval',
     'booked' => 'Booked',
+    'in_transit_to_office' => 'In Transit to Office',
     'item_received' => 'Item Received',
     'in_progress' => 'In Progress',
     'completed' => 'Completed',
-    'in_transit' => 'In Transit',
+    'in_transit' => 'In Transit to Client',
     'delivered' => 'Delivered',
+    'failed' => 'Repair Failed',
     'rejected' => 'Declined',
     'cancelled' => 'Cancelled',
 ];
@@ -40,11 +42,13 @@ const REPAIR_STATUSES = [
 const REPAIR_STATUS_STYLES = [
     'pending_approval' => ['fa-hourglass-half', '#718096'],
     'booked' => ['fa-clipboard-list', '#3182ce'],
+    'in_transit_to_office' => ['fa-truck', '#2b6cb0'],
     'item_received' => ['fa-box', '#4299e1'],
     'in_progress' => ['fa-wrench', '#dd6b20'],
     'completed' => ['fa-check-circle', '#38a169'],
     'in_transit' => ['fa-shipping-fast', '#9f7aea'],
     'delivered' => ['fa-hand-holding', '#805ad5'],
+    'failed' => ['fa-exclamation-triangle', '#b91c1c'],
     'rejected' => ['fa-ban', '#c53030'],
     'cancelled' => ['fa-times-circle', '#e53e3e'],
 ];

@@ -130,11 +130,7 @@ function documentContactInfo() {
     foreach (preg_split('/[\r\n,]+/', (string)($c['address'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) as $line) {
         $left .= '<div style="margin: 2px 0; font-weight: bold; text-transform: uppercase;">' . e(trim($line)) . '</div>';
     }
-    $right = '';
-    $emails = array_unique(array_filter([$c['email'] ?? '', 'simstechzambia@gmail.com']));
-    if ($emails) {
-        $right .= '<div style="margin: 2px 0;"><strong>EMAIL:</strong> ' . e(implode(', ', $emails)) . '</div>';
-    }
+    $right = '<div style="margin: 2px 0;"><strong>EMAIL:</strong> simstechzambia@gmail.com</div>';
     if (!empty($c['tpin'])) {
         $right .= '<div style="margin: 2px 0;"><strong>TPIN #:</strong> ' . e($c['tpin']) . '</div>';
     }

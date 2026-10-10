@@ -109,6 +109,46 @@ $month_items = $item_stats['month'];
 // Repairs by category
 $repair_counts = repairStatusCounts($conn);
 
+// Admin monitoring: repairs and sales tracked per day / week / month / year
+$week_ago = "DATE_SUB(CURDATE(), INTERVAL 7 DAY)";
+$month_start = "DATE_FORMAT(CURDATE(), '%Y-%m-01')";
+$rep_booked = $conn->query("SELECT
+    SUM(created_at >= CURDATE()) AS today,
+    SUM(created_at >= $week_ago) AS week,
+    SUM(created_at >= $month_start) AS month,
+    SUM(YEAR(created_at) = YEAR(CURDATE())) AS year
+    FROM repairs")->fetch_assoc();
+$rep_done = $conn->query("SELECT
+    SUM(completed_date >= CURDATE()) AS today,
+    SUM(completed_date >= $week_ago) AS week,
+    SUM(completed_date >= $month_start) AS month,
+    SUM(YEAR(completed_date) = YEAR(CURDATE())) AS year
+    FROM repairs WHERE completed_date IS NOT NULL")->fetch_assoc();
+$rep_delivered = $conn->query("SELECT
+    SUM(delivered_date >= CURDATE()) AS today,
+    SUM(delivered_date >= $week_ago) AS week,
+    SUM(delivered_date >= $month_start) AS month,
+    SUM(YEAR(delivered_date) = YEAR(CURDATE())) AS year
+    FROM repairs WHERE delivered_date IS NOT NULL")->fetch_assoc();
+$rep_revenue = $conn->query("SELECT
+    COALESCE(SUM(CASE WHEN payment_date >= CURDATE() THEN final_cost END), 0) AS today,
+    COALESCE(SUM(CASE WHEN payment_date >= $week_ago THEN final_cost END), 0) AS week,
+    COALESCE(SUM(CASE WHEN payment_date >= $month_start THEN final_cost END), 0) AS month,
+    COALESCE(SUM(CASE WHEN YEAR(payment_date) = YEAR(CURDATE()) THEN final_cost END), 0) AS year
+    FROM repairs WHERE payment_status = 'paid'")->fetch_assoc();
+$sales_count = $conn->query("SELECT
+    SUM(sale_date >= CURDATE()) AS today,
+    SUM(sale_date >= $week_ago) AS week,
+    SUM(sale_date >= $month_start) AS month,
+    SUM(YEAR(sale_date) = YEAR(CURDATE())) AS year
+    FROM sales WHERE payment_status = 'paid'")->fetch_assoc();
+$items_sold = $conn->query("SELECT
+    COALESCE(SUM(CASE WHEN s.sale_date >= CURDATE() THEN si.quantity END), 0) AS today,
+    COALESCE(SUM(CASE WHEN s.sale_date >= $week_ago THEN si.quantity END), 0) AS week,
+    COALESCE(SUM(CASE WHEN s.sale_date >= $month_start THEN si.quantity END), 0) AS month,
+    COALESCE(SUM(CASE WHEN YEAR(s.sale_date) = YEAR(CURDATE()) THEN si.quantity END), 0) AS year
+    FROM sale_items si JOIN sales s ON si.sale_id = s.id WHERE s.payment_status = 'paid'")->fetch_assoc();
+
 // Get low stock products
 $low_stock_products = getLowStockProducts($conn);
 
@@ -301,6 +341,74 @@ $top_products = $conn->query("
                     </div>
                 </div>
                 
+                <!-- Daily / Weekly / Monthly / Yearly monitor: repairs + sales -->
+                <div class="card mt-4">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <h3><i class="fas fa-chart-line"></i> Repairs &amp; Sales by Period</h3>
+                        <div>
+                            <a href="repairs.php" class="btn btn-secondary btn-sm">Repairs</a>
+                            <a href="sales.php" class="btn btn-secondary btn-sm">Sales</a>
+                        </div>
+                    </div>
+                    <div class="card-body" style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
+                            <thead>
+                                <tr style="background: #f7fafc;">
+                                    <th style="padding: 9px 10px; text-align: left; border-bottom: 2px solid #e2e8f0; color: #4a5568;">Metric</th>
+                                    <th style="padding: 9px 10px; text-align: center; border-bottom: 2px solid #e2e8f0; color: #4a5568;">Today</th>
+                                    <th style="padding: 9px 10px; text-align: center; border-bottom: 2px solid #e2e8f0; color: #4a5568;">This Week</th>
+                                    <th style="padding: 9px 10px; text-align: center; border-bottom: 2px solid #e2e8f0; color: #4a5568;">This Month</th>
+                                    <th style="padding: 9px 10px; text-align: center; border-bottom: 2px solid #e2e8f0; color: #4a5568;">This Year</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="padding: 8px 10px; border-bottom: 1px solid #edf2f7;"><i class="fas fa-clipboard-list" style="color: #3182ce;"></i> Repairs booked</td>
+                                    <?php foreach (['today', 'week', 'month', 'year'] as $p): ?>
+                                        <td style="padding: 8px 10px; text-align: center; border-bottom: 1px solid #edf2f7;"><strong><?php echo (int)$rep_booked[$p]; ?></strong></td>
+                                    <?php endforeach; ?>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 10px; border-bottom: 1px solid #edf2f7;"><i class="fas fa-check-circle" style="color: #38a169;"></i> Items repaired</td>
+                                    <?php foreach (['today', 'week', 'month', 'year'] as $p): ?>
+                                        <td style="padding: 8px 10px; text-align: center; border-bottom: 1px solid #edf2f7;"><strong><?php echo (int)$rep_done[$p]; ?></strong></td>
+                                    <?php endforeach; ?>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 10px; border-bottom: 1px solid #edf2f7;"><i class="fas fa-hand-holding" style="color: #805ad5;"></i> Items delivered to clients</td>
+                                    <?php foreach (['today', 'week', 'month', 'year'] as $p): ?>
+                                        <td style="padding: 8px 10px; text-align: center; border-bottom: 1px solid #edf2f7;"><strong><?php echo (int)$rep_delivered[$p]; ?></strong></td>
+                                    <?php endforeach; ?>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 10px; border-bottom: 1px solid #edf2f7;"><i class="fas fa-tools" style="color: #dd6b20;"></i> Repair revenue</td>
+                                    <?php foreach (['today', 'week', 'month', 'year'] as $p): ?>
+                                        <td style="padding: 8px 10px; text-align: center; border-bottom: 1px solid #edf2f7;"><strong>K<?php echo number_format((float)$rep_revenue[$p], 2); ?></strong></td>
+                                    <?php endforeach; ?>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 10px; border-bottom: 1px solid #edf2f7;"><i class="fas fa-receipt" style="color: #4299e1;"></i> Sales transactions</td>
+                                    <?php foreach (['today', 'week', 'month', 'year'] as $p): ?>
+                                        <td style="padding: 8px 10px; text-align: center; border-bottom: 1px solid #edf2f7;"><strong><?php echo (int)$sales_count[$p]; ?></strong></td>
+                                    <?php endforeach; ?>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 10px; border-bottom: 1px solid #edf2f7;"><i class="fas fa-box" style="color: #319795;"></i> Items sold</td>
+                                    <?php foreach (['today', 'week', 'month', 'year'] as $p): ?>
+                                        <td style="padding: 8px 10px; text-align: center; border-bottom: 1px solid #edf2f7;"><strong><?php echo (int)$items_sold[$p]; ?></strong></td>
+                                    <?php endforeach; ?>
+                                </tr>
+                                <tr style="background: #f7fafc;">
+                                    <td style="padding: 8px 10px;"><i class="fas fa-money-bill-wave" style="color: #38a169;"></i> <strong>Sales revenue</strong></td>
+                                    <?php foreach (['today', 'week', 'month', 'year'] as $p): ?>
+                                        <td style="padding: 8px 10px; text-align: center;"><strong>K<?php echo number_format((float)$sales_stats[$p], 2); ?></strong></td>
+                                    <?php endforeach; ?>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <!-- Charts Row -->
                 <div class="grid-2 mt-4">
                     <div class="card">
